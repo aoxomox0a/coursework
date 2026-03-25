@@ -1,15 +1,14 @@
 [project]
-name = "groupe-c-lamia-tmfz"
+name = "nl-to-sparql"
 version = "0.1.0"
-description = "SPARQL translation from natural language and NL-to-SPARQL"
-readme = "README.md"
-requires-python = ">=3.13"
+description = "Natural Language to SPARQL Query System"
+requires-python = ">=3.10"
 dependencies = [
-    "chromadb==0.4.24",
     "fastapi==0.104.0",
-    "python-dotenv==1.0.0",
+    "uvicorn==0.24.0",
     "requests==2.31.0",
-    "sentence-transformers==2.7.0",
-    "uvicorn[standard]==0.24.0",
+    "python-dotenv==1.0.0",
+    "sentence-transformers==2.6.1",
+    "chromadb==0.4.21",
+    "numpy<2.0",
 ]
-

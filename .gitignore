@@ -1,0 +1,37 @@
+# =========================
+# 1. Python & Environment
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# uv virtual environment (CRITICAL: Do not commit the environment)
+.venv/
+venv/
+env/
+
+# =========================
+# 2. Machine Learning & Data
+# =========================
+# Ignore downloaded/fine-tuned Hugging Face models
+/tf-model/
+
+# Ignore raw PDFs, interim Excel files, and final datasets
+/data/
+
+# =========================
+# 3. Vector Database
+# =========================
+# Ignore ChromaDB local storage (prevents committing SQLite binaries)
+/project_vector_db/
+chroma.sqlite3
+
+# =========================
+# 4. IDEs & OS Files
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+=======
