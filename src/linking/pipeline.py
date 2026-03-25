@@ -61,14 +61,7 @@ def run_linking_pipeline(question: List[str]):
 
 if __name__ == "__main__":
     test_questions = [
-        # Level 1: Standard Verb Relation
-        "Who directed the movie Inception?",
-        # Level 2: Multi-hop Nouns (Two properties)
-        "What is the population of the capital of France?",
-        # Level 3: Complex Entities & Action Verbs
-        "When did George Washington cross the Delaware River?",
-        # Level 4: The "Implicit" Property
-        "Give me all the movies starring Leonardo DiCaprio.",
+        "Who directed the movie Inception released in 2010?",
     ]
     # test_question = "Who is the author of The Great Gatsby?"
     result = run_linking_pipeline(test_questions)

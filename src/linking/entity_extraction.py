@@ -4,6 +4,9 @@ Extract entities from natural language questions using spaCy.
 
 from typing import List, Tuple
 from src.linking.spacy_setup import load_spacy_model
+import torch
+
+# torch.set_num_threads(8)
 
 
 def extract_entities(question: List[str], nlp=None) -> List[Tuple[str, str]]:
@@ -12,9 +15,12 @@ def extract_entities(question: List[str], nlp=None) -> List[Tuple[str, str]]:
     if nlp is None:
         nlp = load_spacy_model()
 
-    doc_stream = nlp.pipe(question)
+    # disable gradient calculation
+    with torch.no_grad():
+        docs = list(nlp.pipe(question, batch_size=8))
+
     all_entities = []
-    for doc in doc_stream:
+    for doc in docs:
         entities = [
             (ent.text, ent.label_) for ent in doc.ents
         ]  # rely on spacy's default entity recognition
@@ -31,7 +37,8 @@ def extract_noun_phrases(questions: List[str], nlp=None) -> List[List[str]]:
     if nlp is None:
         nlp = load_spacy_model()
 
-    doc_stream = nlp.pipe(questions)
+    with torch.no_grad():
+        doc_stream = nlp.pipe(questions)
 
     all_candidates = []
 

@@ -2,6 +2,7 @@
 Configuration settings for NL-to-SPARQL system.
 Read from environment variables.
 """
+
 import os
 from dotenv import load_dotenv
 
@@ -17,7 +18,7 @@ CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 # spaCy Model Configuration
-SPACY_MODEL = os.getenv("SPACY_MODEL", "en_core_web_sm")
+SPACY_MODEL = os.getenv("SPACY_MODEL", "en_core_web_trf")
 
 # LLM Configuration
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
