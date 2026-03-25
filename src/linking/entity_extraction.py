@@ -1,45 +1,61 @@
 """
 Extract entities from natural language questions using spaCy.
 """
+
 from typing import List, Tuple
 from src.linking.spacy_setup import load_spacy_model
 
 
-def extract_entities(question: str, nlp=None) -> List[Tuple[str, str]]:
+def extract_entities(question: List[str], nlp=None) -> List[Tuple[str, str]]:
+    # Extract named entities from a question.
+
+    if nlp is None:
+        nlp = load_spacy_model()
+
+    doc_stream = nlp.pipe(question)
+    all_entities = []
+    for doc in doc_stream:
+        entities = [
+            (ent.text, ent.label_) for ent in doc.ents
+        ]  # rely on spacy's default entity recognition
+        all_entities.append(entities)
+
+    return all_entities
+
+
+def extract_noun_phrases(questions: List[str], nlp=None) -> List[List[str]]:
     """
-    Extract named entities from a question.
-
-    Args:
-        question: Natural language question
-        nlp: spaCy Language object (loads default if None)
-
-    Returns:
-        List of tuples: (entity_text, entity_label)
+    Extract property/relation candidates for a batch of questions.
+    Returns a list of lists, maintaining the exact index mapping to the input questions.
     """
     if nlp is None:
         nlp = load_spacy_model()
 
-    doc = nlp(question)
-    entities = [(ent.text, ent.label_) for ent in doc.ents]
+    doc_stream = nlp.pipe(questions)
 
-    return entities
+    all_candidates = []
 
+    for doc in doc_stream:
+        entity_tokens = set()
+        for ent in doc.ents:
+            for token in ent:
+                entity_tokens.add(token.text)
 
-def extract_noun_phrases(question: str, nlp=None) -> List[str]:
-    """
-    Extract noun phrases which are good candidates for entity linking.
+        # 2. Reset the temporary list for THIS specific document only
+        valid_candidates = []
 
-    Args:
-        question: Natural language question
-        nlp: spaCy Language object (loads default if None)
+        for token in doc:
+            if token.text in entity_tokens:
+                continue
+            if token.pos_ in ["PRON", "AUX"]:
+                continue
+            if token.pos_ in ["NOUN", "VERB"]:
+                word = token.lemma_ if token.pos_ == "VERB" else token.text
+                valid_candidates.append(word)
 
-    Returns:
-        List of noun phrase strings
-    """
-    if nlp is None:
-        nlp = load_spacy_model()
+        # 3. Deduplicate this document's candidates and append to the master list
+        unique_candidates = list(dict.fromkeys(valid_candidates))
+        all_candidates.append(unique_candidates)
 
-    doc = nlp(question)
-    noun_phrases = [chunk.text for chunk in doc.noun_chunks]
-
-    return noun_phrases
+    # 4. Return the master list
+    return all_candidates
