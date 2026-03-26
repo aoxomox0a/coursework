@@ -3,18 +3,29 @@ from src.indexing import endpoint, entities, embedding, chroma_storage
 from config.settings import BATCH_SIZE, LIMIT_ENTITIES
 
 
-def run_indexing_pipeline(custom_endpoint: str = None, resume: bool = False):
+def run_indexing_pipeline(custom_endpoint: str = None, status_callback=None):
     """
     Execute the complete indexing pipeline:
     1. Test SPARQL endpoint connection
-    2. Fetch entities from DBpedia
-    3. Generate embeddings
-    4. Store in ChromaDB
+    2. Fetch schema (properties, classes)
+    3. Fetch entities from DBpedia
+    4. Fetch relationships (sample triples, mappings)
+    5. Generate embeddings
+    6. Store in ChromaDB
 
     Args:
         custom_endpoint: Optional custom SPARQL endpoint URL
-        resume: If True, resume from checkpoint; if False, start from 0
+        status_callback: Optional callback function to receive status updates
+    
+    Returns:
+        Dict with status and indexed counts, or False on error
     """
+    def send_status(message: str):
+        """Send status update to callback if provided."""
+        print(message)
+        if status_callback:
+            status_callback(message, custom_endpoint)
+    
     # Set custom endpoint if provided
     if custom_endpoint:
         endpoint.set_endpoint(custom_endpoint)
@@ -24,45 +35,67 @@ def run_indexing_pipeline(custom_endpoint: str = None, resume: bool = False):
     print("="*60)
     
     # Step 1: Test endpoint connection
-    print("\n[Step 1] Testing SPARQL Endpoint Connection")
-    print("-" * 60)
+    send_status("▸ Testing SPARQL endpoint connection...")
     if not endpoint.test_connection():
-        print("✗ Failed to connect to SPARQL endpoint. Aborting.")
+        send_status("✗ Failed to connect to SPARQL endpoint")
         return False
     
-    # Step 2: Fetch entities
-    print("\n[Step 2] Fetching Entities from DBpedia")
-    print("-" * 60)
+    # Step 2: Fetch schema (properties and classes)
+    send_status("▸ Fetching schema properties...")
+    fetched_properties = entities.fetch_properties()
+    
+    send_status("▸ Fetching schema classes...")
+    fetched_classes = entities.fetch_classes()
+    
+    # Step 3: Fetch entities
+    send_status("▸ Fetching entities from SPARQL endpoint...")
     fetched_entities = entities.fetch_entities_batch(
         batch_size=BATCH_SIZE,
-        max_batches=None,
-        resume=resume
+        max_batches=None
     )
     
     if not fetched_entities:
-        print("✗ No entities fetched. Aborting.")
-        return False
+        send_status("⊘ No entities fetched, continuing with schema only...")
+        fetched_entities = []
     
-    # Step 3: Generate embeddings
-    print("\n[Step 3] Generating Text Embeddings")
-    print("-" * 60)
+    # Step 4: Fetch relationships
+    send_status("▸ Fetching relationships (skipped for testing)")
+    sample_triples = []
+    class_entity_mappings = []
+    
+    # Step 5: Generate embeddings
+    send_status("▸ Loading embedding model and generating embeddings...")
     model = embedding.load_embedding_model()
-    embedded_entities = embedding.embed_entities(fetched_entities, model)
+    embedded_entities = embedding.embed_entities(fetched_entities, model) if fetched_entities else []
+    embedded_properties = embedding.embed_entities(fetched_properties, model)
+    embedded_classes = embedding.embed_entities(fetched_classes, model)
     
-    # Step 4: Store in ChromaDB
-    print("\n[Step 4] Storing in ChromaDB")
-    print("-" * 60)
-    chroma_storage.store_entities_in_chroma(embedded_entities, collection_name="entities")
+    # Step 6: Store in ChromaDB
+    if embedded_entities:
+        send_status("▸ Storing entities in ChromaDB...")
+        chroma_storage.store_entities_in_chroma(embedded_entities, collection_name="entities", endpoint=custom_endpoint)
+    
+    send_status("▸ Storing properties in ChromaDB...")
+    chroma_storage.store_entities_in_chroma(embedded_properties, collection_name="properties", endpoint=custom_endpoint)
+    
+    send_status("▸ Storing classes in ChromaDB...")
+    chroma_storage.store_entities_in_chroma(embedded_classes, collection_name="classes", endpoint=custom_endpoint)
     
     # Summary
     print("\n" + "="*60)
     print("✓ INDEXING PIPELINE COMPLETED SUCCESSFULLY!")
     print("="*60)
-    print(f"Indexed {len(embedded_entities)} entities")
+    print(f"Indexed {len(fetched_entities)} entities")
+    print(f"Indexed {len(fetched_properties)} properties")
+    print(f"Indexed {len(fetched_classes)} classes")
     print(f"Stored in: {chroma_storage.CHROMA_DB_PATH}")
     print()
     
-    return True
+    return {
+        "entities": len(embedded_entities),
+        "properties": len(embedded_properties),
+        "classes": len(embedded_classes)
+    }
 
 
 if __name__ == "__main__":

@@ -5,61 +5,55 @@ import styles from '../styles/IndexingPanel.module.css';
 export default function IndexingPanel() {
   const [endpoint, setEndpoint] = useState('http://dbpedia.org/sparql');
   const [isIndexing, setIsIndexing] = useState(false);
-  const [resumeFromCheckpoint, setResumeFromCheckpoint] = useState(false);
-  const [totalEntities, setTotalEntities] = useState(0);
-  const [indexedEntities, setIndexedEntities] = useState(0);
-  const [loadingProgress, setLoadingProgress] = useState(false);
-  const [currentProcess, setCurrentProcess] = useState(''); // 'fetching', 'indexing', 'saving'
-  const [processProgress, setProcessProgress] = useState(0);
-  const [processTotal, setProcessTotal] = useState(0);
+  const [loadingCounts, setLoadingCounts] = useState(false);
+  const [indexedCounts, setIndexedCounts] = useState({ 
+    entities: 0, 
+    properties: 0, 
+    classes: 0,
+    sample_triples: 0,
+    class_entity_mappings: 0
+  });
 
   const predefinedEndpoints = [
     { label: 'DBpedia', value: 'http://dbpedia.org/sparql' },
     { label: 'Wikidata', value: 'https://query.wikidata.org/sparql' },
   ];
 
-  const fetchProgress = async (endpointUrl) => {
-    setLoadingProgress(true);
+  const fetchCollectionCounts = async (endpointUrl) => {
+    setLoadingCounts(true);
     try {
-      const response = await axios.post('/api/progress', {
+      const response = await axios.post('/api/counts', {
         endpoint: endpointUrl
       });
-
       if (response.data.status === 'success') {
-        setTotalEntities(response.data.total || 0);
-        setIndexedEntities(response.data.indexed || 0);
+        const counts = response.data.counts || {};
+        setIndexedCounts({
+          entities: counts.entities || 0,
+          properties: counts.properties || 0,
+          classes: counts.classes || 0,
+          sample_triples: counts.sample_triples || 0,
+          class_entity_mappings: counts.class_entity_mappings || 0
+        });
       }
     } catch (error) {
-      console.error('Error fetching progress:', error);
+      console.error('Error fetching collection counts:', error);
     } finally {
-      setLoadingProgress(false);
+      setLoadingCounts(false);
     }
   };
 
-  // Fetch progress on component mount
+  // Fetch counts on component mount
   useEffect(() => {
-    fetchProgress('http://dbpedia.org/sparql');
+    const defaultEndpoint = 'http://dbpedia.org/sparql';
+    fetchCollectionCounts(defaultEndpoint);
   }, []);
 
   const handleEndpointChange = (value) => {
     setEndpoint(value);
     if (value.trim()) {
-      fetchProgress(value);
+      // Fetch counts for the new endpoint
+      fetchCollectionCounts(value);
     }
-  };
-
-  const renderProgressBar = (current, total, width = 30) => {
-    if (total === 0) return '0%|' + '░'.repeat(width) + '| 0/0';
-    
-    const percentage = Math.round((current / total) * 100);
-    const filledChars = Math.round((current / total) * width);
-    const emptyChars = width - filledChars;
-    
-    const filled = '█'.repeat(Math.max(0, filledChars - 1));
-    const partial = filledChars > 0 ? '▍' : '';
-    const empty = '░'.repeat(Math.max(0, emptyChars));
-    
-    return `${percentage}%|${filled}${partial}${empty}| ${current}/${total}`;
   };
 
   const handleIndex = async () => {
@@ -69,67 +63,45 @@ export default function IndexingPanel() {
     }
 
     setIsIndexing(true);
-    setCurrentProcess('fetching');
-    setProcessProgress(0);
-    setProcessTotal(totalEntities);
 
     try {
-      // Simulate fetching with progress
-      for (let i = 0; i <= totalEntities; i += Math.ceil(totalEntities / 10)) {
-        setProcessProgress(Math.min(i, totalEntities));
-        await new Promise(r => setTimeout(r, 100));
-      }
-      setProcessProgress(totalEntities);
-
-      // Switch to indexing
-      setCurrentProcess('indexing');
-      setProcessProgress(0);
-      setProcessTotal(totalEntities);
-
-      // Simulate indexing with progress
-      for (let i = 0; i <= totalEntities; i += Math.ceil(totalEntities / 10)) {
-        setProcessProgress(Math.min(i, totalEntities));
-        await new Promise(r => setTimeout(r, 100));
-      }
-      setProcessProgress(totalEntities);
-
-      // Fetch with custom endpoint
-      const response = await axios.post('/api/index', {
-        endpoint: endpoint,
-        resume: resumeFromCheckpoint
+      // Start the indexing process in background
+      await axios.post('/api/index', {
+        endpoint: endpoint
       });
 
-      // Switch to saving
-      setCurrentProcess('saving');
-      setProcessProgress(0);
-      setProcessTotal(totalEntities);
+      // Wait a moment and then show completion
+      setTimeout(() => {
+        alert('✓ Indexing started in background and will complete shortly');
+      }, 500);
 
-      // Simulate saving with progress
-      for (let i = 0; i <= totalEntities; i += Math.ceil(totalEntities / 10)) {
-        setProcessProgress(Math.min(i, totalEntities));
-        await new Promise(r => setTimeout(r, 100));
-      }
-      setProcessProgress(totalEntities);
-
-      if (response.data.status === 'success') {
-        setCurrentProcess('');
-        setTimeout(() => {
-          alert('✓ Indexing completed successfully!');
-        }, 500);
-      } else {
-        setCurrentProcess('');
-        alert('✗ Indexing failed: ' + (response.data.message || 'Unknown error'));
+      // Fetch final counts once after a delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        const countsResponse = await axios.post('/api/counts', {
+          endpoint: endpoint
+        });
+        if (countsResponse.data.status === 'success') {
+          setIndexedCounts({
+            entities: countsResponse.data.counts.entities || 0,
+            properties: countsResponse.data.counts.properties || 0,
+            classes: countsResponse.data.counts.classes || 0,
+            sample_triples: countsResponse.data.counts.sample_triples || 0,
+            class_entity_mappings: countsResponse.data.counts.class_entity_mappings || 0
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching final counts:', error);
       }
     } catch (error) {
-      setCurrentProcess('');
-      alert('✗ Indexing failed: ' + (error.message || 'Failed to connect to the backend API'));
+      alert('✗ Failed to start indexing: ' + (error.message || 'Unknown error'));
       console.error('Indexing error:', error);
     } finally {
       setIsIndexing(false);
-      setProcessProgress(0);
-      setProcessTotal(0);
     }
   };
+
+
 
   return (
     <div className={styles.container}>
@@ -172,63 +144,37 @@ export default function IndexingPanel() {
           >
             {isIndexing ? 'Loading and indexing...' : '▶ Load and index'}
           </button>
-
-          {indexedEntities > 0 && (
-            <div className={styles.uploadedInfo}>
-              Uploaded: {indexedEntities} / {totalEntities}
-            </div>
-          )}
         </div>
 
-        {/* Resume checkbox - only visible if entities exist */}
-        {indexedEntities > 0 && (
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={resumeFromCheckpoint}
-              onChange={(e) => setResumeFromCheckpoint(e.target.checked)}
-              disabled={isIndexing}
-              className={styles.checkbox}
-            />
-            Resume loading
-          </label>
-        )}
-
-        {/* Progress bar before indexing starts */}
-        {totalEntities > 0 && !currentProcess && (
-          <div className={styles.progressSection}>
-            <div className={styles.progressStats}>
-              <span>{indexedEntities} / {totalEntities} entities indexed</span>
-              <span className={styles.progressPercent}>
-                {totalEntities > 0 ? Math.round((indexedEntities / totalEntities) * 100) : 0}%
-              </span>
-            </div>
-            <div className={styles.progressBar}>
-              <div
-                className={styles.progressFill}
-                style={{ width: totalEntities > 0 ? ((indexedEntities / totalEntities) * 100) : 0 + '%' }}
-              />
-            </div>
-          </div>
-        )}
-
-        {loadingProgress && (
-          <div className={styles.loadingMessage}>
-            Loading entity count...
-          </div>
-        )}
-
-        {/* Fancy progress bar during processing */}
-        {currentProcess && (
-          <div className={styles.fancyProgressSection}>
-            <div className={styles.processLabel}>
-              {currentProcess.charAt(0).toUpperCase() + currentProcess.slice(1)}...
-            </div>
-            <div className={styles.fancyProgressBar}>
-              <code>{renderProgressBar(processProgress, processTotal)}</code>
-            </div>
-          </div>
-        )}
+        {/* Indexed counts display */}
+        <div className={styles.countsDisplay}>
+          {loadingCounts ? (
+            <div className={styles.loadingCounts}>Loading counts...</div>
+          ) : (
+            <>
+              <div className={styles.countItem}>
+                <span className={styles.countLabel}>Properties:</span>
+                <span className={styles.countValue}>{indexedCounts.properties} indexed</span>
+              </div>
+              <div className={styles.countItem}>
+                <span className={styles.countLabel}>Classes:</span>
+                <span className={styles.countValue}>{indexedCounts.classes} indexed</span>
+              </div>
+              <div className={styles.countItem}>
+                <span className={styles.countLabel}>Entities:</span>
+                <span className={styles.countValue}>{indexedCounts.entities} indexed</span>
+              </div>
+              <div className={styles.countItem}>
+                <span className={styles.countLabel}>Sample Triples:</span>
+                <span className={styles.countValue}>{indexedCounts.sample_triples} indexed</span>
+              </div>
+              <div className={styles.countItem}>
+                <span className={styles.countLabel}>Class-Entity Mappings:</span>
+                <span className={styles.countValue}>{indexedCounts.class_entity_mappings} indexed</span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

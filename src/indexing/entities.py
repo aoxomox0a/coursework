@@ -1,46 +1,6 @@
 """Entity Fetching - Fetch entities and labels from DBpedia."""
-import json
-import os
 from src.indexing.endpoint import query_sparql
 from config.settings import LIMIT_ENTITIES
-
-
-CHECKPOINT_FILE = "./data/indexing_checkpoint.json"
-
-
-def load_checkpoint():
-    """Load checkpoint data if it exists."""
-    if os.path.exists(CHECKPOINT_FILE):
-        try:
-            with open(CHECKPOINT_FILE, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Warning: Could not load checkpoint: {e}")
-    return None
-
-
-def save_checkpoint(offset: int, batch_count: int, total_entities: int):
-    """Save checkpoint data."""
-    os.makedirs(os.path.dirname(CHECKPOINT_FILE), exist_ok=True)
-    checkpoint = {
-        "offset": offset,
-        "batch_count": batch_count,
-        "total_entities": total_entities
-    }
-    try:
-        with open(CHECKPOINT_FILE, 'w') as f:
-            json.dump(checkpoint, f)
-    except Exception as e:
-        print(f"Warning: Could not save checkpoint: {e}")
-
-
-def clear_checkpoint():
-    """Delete checkpoint file to start fresh."""
-    try:
-        if os.path.exists(CHECKPOINT_FILE):
-            os.remove(CHECKPOINT_FILE)
-    except Exception as e:
-        print(f"Warning: Could not clear checkpoint: {e}")
 
 
 def get_total_entity_count(sparql_endpoint: str = None) -> int:
@@ -149,14 +109,177 @@ def fetch_entities(limit: int = None) -> list:
     return entities
 
 
-def fetch_entities_batch(batch_size: int = 1000, max_batches: int = None, resume: bool = False) -> list:
+def fetch_properties(limit: int = None) -> list:
+    """
+    Fetch all properties/predicates from the SPARQL endpoint.
+    
+    Args:
+        limit: Maximum number of properties to fetch (None for no limit)
+        
+    Returns:
+        List of dicts with 'uri' and 'label' keys
+    """
+    limit_clause = "" if limit is None else f"LIMIT {limit}"
+    
+    query = f"""
+    SELECT DISTINCT ?property ?label
+    WHERE {{
+        ?property a rdf:Property .
+        OPTIONAL {{ ?property rdfs:label ?label . }}
+    }}
+    {limit_clause}
+    """
+    
+    print("Fetching properties/predicates...")
+    
+    results = query_sparql(query)
+    properties = []
+    
+    if "results" in results and "bindings" in results["results"]:
+        for binding in results["results"]["bindings"]:
+            prop = {
+                "uri": binding.get("property", {}).get("value", ""),
+                "label": binding.get("label", {}).get("value", "")
+            }
+            if prop["uri"]:
+                properties.append(prop)
+    
+    print(f"✓ Fetched {len(properties)} properties")
+    return properties
+
+
+def fetch_classes(limit: int = None) -> list:
+    """
+    Fetch all classes/types from the SPARQL endpoint.
+    
+    Args:
+        limit: Maximum number of classes to fetch (None for no limit)
+        
+    Returns:
+        List of dicts with 'uri' and 'label' keys
+    """
+    limit_clause = "" if limit is None else f"LIMIT {limit}"
+    
+    query = f"""
+    SELECT DISTINCT ?class ?label
+    WHERE {{
+        ?class a rdfs:Class .
+        OPTIONAL {{ ?class rdfs:label ?label . }}
+    }}
+    {limit_clause}
+    """
+    
+    print("Fetching classes/types...")
+    
+    results = query_sparql(query)
+    classes = []
+    
+    if "results" in results and "bindings" in results["results"]:
+        for binding in results["results"]["bindings"]:
+            cls = {
+                "uri": binding.get("class", {}).get("value", ""),
+                "label": binding.get("label", {}).get("value", "")
+            }
+            if cls["uri"]:
+                classes.append(cls)
+    
+    print(f"✓ Fetched {len(classes)} classes")
+    return classes
+
+
+def fetch_sample_triples(limit: int = 10000) -> list:
+    """
+    Fetch sample triples (relationships) from the SPARQL endpoint.
+    
+    Args:
+        limit: Maximum number of triples to fetch
+        
+    Returns:
+        List of dicts with 'subject', 'predicate', 'object' and labels
+    """
+    query = f"""
+    SELECT ?subject ?subjectLabel ?predicate ?predicateLabel ?object ?objectLabel
+    WHERE {{
+        ?subject ?predicate ?object ;
+                 rdfs:label ?subjectLabel .
+        ?object rdfs:label ?objectLabel .
+        OPTIONAL {{ ?predicate rdfs:label ?predicateLabel . }}
+        FILTER(isResource(?object))
+    }}
+    LIMIT {limit}
+    """
+    
+    print(f"Fetching sample triples (limit: {limit})...")
+    
+    results = query_sparql(query)
+    triples = []
+    
+    if "results" in results and "bindings" in results["results"]:
+        for binding in results["results"]["bindings"]:
+            triple = {
+                "subject": binding.get("subject", {}).get("value", ""),
+                "subjectLabel": binding.get("subjectLabel", {}).get("value", ""),
+                "predicate": binding.get("predicate", {}).get("value", ""),
+                "predicateLabel": binding.get("predicateLabel", {}).get("value", ""),
+                "object": binding.get("object", {}).get("value", ""),
+                "objectLabel": binding.get("objectLabel", {}).get("value", "")
+            }
+            if triple["subject"] and triple["predicate"] and triple["object"]:
+                triples.append(triple)
+    
+    print(f"✓ Fetched {len(triples)} sample triples")
+    return triples
+
+
+def fetch_class_entity_mappings(limit: int = None) -> list:
+    """
+    Fetch mappings of entities to their classes/types.
+    
+    Args:
+        limit: Maximum number of mappings to fetch (None for no limit)
+        
+    Returns:
+        List of dicts with entity, entityLabel, class, classLabel
+    """
+    limit_clause = "" if limit is None else f"LIMIT {limit}"
+    
+    query = f"""
+    SELECT ?entity ?entityLabel ?class ?classLabel
+    WHERE {{
+        ?entity rdf:type ?class ;
+                rdfs:label ?entityLabel .
+        ?class rdfs:label ?classLabel .
+    }}
+    {limit_clause}
+    """
+    
+    print("Fetching class-entity mappings...")
+    
+    results = query_sparql(query)
+    mappings = []
+    
+    if "results" in results and "bindings" in results["results"]:
+        for binding in results["results"]["bindings"]:
+            mapping = {
+                "entity": binding.get("entity", {}).get("value", ""),
+                "entityLabel": binding.get("entityLabel", {}).get("value", ""),
+                "class": binding.get("class", {}).get("value", ""),
+                "classLabel": binding.get("classLabel", {}).get("value", "")
+            }
+            if mapping["entity"] and mapping["class"]:
+                mappings.append(mapping)
+    
+    print(f"✓ Fetched {len(mappings)} class-entity mappings")
+    return mappings
+
+
+def fetch_entities_batch(batch_size: int = 1000, max_batches: int = None) -> list:
     """
     Fetch entities in batches with pagination.
     
     Args:
         batch_size: Number of entities per batch
         max_batches: Maximum number of batches (-1 for unlimited)
-        resume: If True, resume from last checkpoint; if False, start from 0
         
     Returns:
         List of all entities
@@ -165,20 +288,7 @@ def fetch_entities_batch(batch_size: int = 1000, max_batches: int = None, resume
     offset = 0
     batch_count = 0
     
-    # Load checkpoint if resume is True
-    if resume:
-        checkpoint = load_checkpoint()
-        if checkpoint:
-            offset = checkpoint["offset"]
-            batch_count = checkpoint["batch_count"]
-            print(f"Resuming from checkpoint: offset={offset}, batch_count={batch_count}")
-        else:
-            print("No checkpoint found. Starting from 0.")
-    else:
-        # Clear checkpoint if not resuming
-        clear_checkpoint()
-    
-    print(f"Fetching entities in batches (batch_size: {batch_size}, starting offset: {offset})...")
+    print(f"Fetching entities in batches (batch_size: {batch_size})...")
     
     while True:
         batch_num = batch_count + 1
@@ -212,9 +322,6 @@ def fetch_entities_batch(batch_size: int = 1000, max_batches: int = None, resume
         
         all_entities.extend(batch_entities)
         print(f"  Batch {batch_num}: {len(batch_entities)} entities (total: {len(all_entities)})")
-        
-        # Save checkpoint after each batch
-        save_checkpoint(offset + batch_size, batch_count + 1, len(all_entities))
         
         if len(batch_entities) < batch_size:
             break

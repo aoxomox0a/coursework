@@ -298,6 +298,45 @@
   border-radius: 3px;
 }
 
+.countsDisplay {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f0f4f8;
+  border-radius: 6px;
+  border-left: 4px solid #667eea;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loadingCounts {
+  color: #667eea;
+  font-weight: 500;
+  font-size: 12px;
+  text-align: center;
+  padding: 4px 0;
+  font-style: italic;
+}
+
+.countItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 3px 0;
+}
+
+.countLabel {
+  font-weight: 600;
+  color: #555;
+}
+
+.countValue {
+  font-weight: 700;
+  color: #667eea;
+  font-size: 13px;
+}
+
 .progressText {
   font-size: 12px;
   color: #666;
