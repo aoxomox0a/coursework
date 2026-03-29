@@ -1,4 +1,9 @@
 # =========================
+# 0. Secrets
+# =========================
+.env
+
+# =========================
 # 1. Python & Environment
 # =========================
 __pycache__/
@@ -34,4 +39,18 @@ chroma.sqlite3
 .idea/
 .DS_Store
 Thumbs.db
-=======
+.claude/
+
+# =========================
+# 6. Testing & Coverage
+# =========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# =========================
+# 7. Ruff
+# =========================
+.ruff_cache/

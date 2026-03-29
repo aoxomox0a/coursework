@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from api.routes import indexing
+from api.routes import indexing, sparql
 
 app = FastAPI(
     title="NL-to-SPARQL API",
@@ -22,6 +22,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(indexing.router, prefix="/api")
+app.include_router(sparql.router, prefix="/api")
 
 
 class IndexRequest(BaseModel):

@@ -1,12 +1,15 @@
 """
-Validate SPARQL query syntax.
+Validate SPARQL query syntax using rdflib's full SPARQL 1.1 parser.
 """
-import re
+import logging
+from rdflib.plugins.sparql import prepareQuery
+
+logger = logging.getLogger(__name__)
 
 
 def is_valid_sparql(query: str) -> tuple[bool, str]:
     """
-    Basic SPARQL validation.
+    Validate SPARQL syntax using rdflib prepareQuery.
 
     Args:
         query: SPARQL query string
@@ -14,43 +17,25 @@ def is_valid_sparql(query: str) -> tuple[bool, str]:
     Returns:
         Tuple of (is_valid, error_message)
     """
-    errors = []
+    if not query or not query.strip():
+        return False, "Query is empty"
 
-    # Check for required keywords
-    if not any(keyword in query.upper() for keyword in ["SELECT", "CONSTRUCT", "ASK", "DESCRIBE"]):
-        errors.append("Missing query type (SELECT, CONSTRUCT, ASK, or DESCRIBE)")
-
-    # Check for balanced braces
-    if query.count("{") != query.count("}"):
-        errors.append("Unbalanced braces: { and }")
-
-    # Check for balanced parentheses
-    if query.count("(") != query.count(")"):
-        errors.append("Unbalanced parentheses")
-
-    # Check for WHERE clause
-    if "WHERE" not in query.upper():
-        errors.append("Missing WHERE clause")
-
-    # Check for basic syntax patterns
-    if not re.search(r"\?[a-zA-Z_]\w*", query):
-        errors.append("No SPARQL variables found (?var)")
-
-    if errors:
-        return False, "; ".join(errors)
-
-    return True, ""
+    try:
+        prepareQuery(query)
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
 
 
 def validate_and_get_error(query: str) -> str:
     """
-    Get error message if query is invalid.
+    Return error message if query is invalid, empty string if valid.
 
     Args:
         query: SPARQL query string
 
     Returns:
-        Error message or empty string if valid
+        Error message or empty string
     """
     is_valid, error = is_valid_sparql(query)
     return "" if is_valid else error

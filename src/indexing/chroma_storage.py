@@ -4,6 +4,24 @@ import chromadb
 from urllib.parse import urlparse
 from config.settings import CHROMA_DB_PATH
 
+# Disable telemetry before any client is created (avoids capture() exceptions)
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+
+_client = None
+
+
+def get_chroma_client():
+    """Return the shared ChromaDB persistent client (process-level singleton)."""
+    global _client
+    if _client is None:
+        os.makedirs(CHROMA_DB_PATH, exist_ok=True)
+        _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    return _client
+
+
+# Internal alias
+_get_client = get_chroma_client
+
 
 def get_endpoint_slug(endpoint: str) -> str:
     """
@@ -56,16 +74,36 @@ def get_collection_name(base_name: str, endpoint: str = None) -> str:
     return base_name
 
 
-def initialize_chromadb():
+def initialize_chromadb() -> chromadb.PersistentClient:
     """Initialize ChromaDB client with persistent storage."""
-    # Create data directory if it doesn't exist
-    os.makedirs(CHROMA_DB_PATH, exist_ok=True)
-    
     print(f"Initializing ChromaDB (path: {CHROMA_DB_PATH})...")
-    client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    client = _get_client()
     print("✓ ChromaDB initialized")
-    
     return client
+
+
+def is_endpoint_indexed(endpoint: str = None) -> bool:
+    """
+    Check whether the given endpoint has already been indexed.
+
+    Uses the `properties` collection as the canonical indicator — it is always
+    populated during indexing (unlike `entities` which may be skipped).
+
+    Args:
+        endpoint: SPARQL endpoint URL (None → default collection names)
+
+    Returns:
+        True if the endpoint has been indexed and the collection is non-empty.
+    """
+    try:
+        client = _get_client()
+        existing = {c.name for c in client.list_collections()}
+        props_name = get_collection_name("properties", endpoint)
+        if props_name not in existing:
+            return False
+        return client.get_collection(name=props_name).count() > 0
+    except Exception:
+        return False
 
 
 def get_indexed_count(collection_name: str = "entities", endpoint: str = None) -> int:
@@ -80,7 +118,7 @@ def get_indexed_count(collection_name: str = "entities", endpoint: str = None) -
         Count of indexed entities
     """
     try:
-        client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        client = _get_client()
         
         # Generate endpoint-specific collection name
         final_collection_name = get_collection_name(collection_name, endpoint)
@@ -166,14 +204,17 @@ def store_entities_in_chroma(entities: list, collection_name: str = "entities", 
             "label": entity["label"]
         })
     
-    # Add to collection
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        documents=documents,
-        metadatas=metadatas
-    )
-    
+    # Add in chunks — ChromaDB rejects batches larger than ~5461
+    _CHROMA_MAX_BATCH = 5000
+    for start in range(0, len(ids), _CHROMA_MAX_BATCH):
+        end = start + _CHROMA_MAX_BATCH
+        collection.add(
+            ids=ids[start:end],
+            embeddings=embeddings[start:end],
+            documents=documents[start:end],
+            metadatas=metadatas[start:end],
+        )
+
     print(f"✓ Stored {len(entities)} entities in ChromaDB")
     return collection
 

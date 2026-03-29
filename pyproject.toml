@@ -15,6 +15,10 @@ dependencies = [
     "en-core-web-sm",
     "spacy-transformers>=1.4.0",
     "en-core-web-trf",
+    "rdflib>=7.0.0",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "httpx<0.28",
 ]
 
 [tool.uv.sources]

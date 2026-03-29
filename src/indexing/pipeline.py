@@ -47,12 +47,16 @@ def run_indexing_pipeline(custom_endpoint: str = None, status_callback=None):
     send_status("▸ Fetching schema classes...")
     fetched_classes = entities.fetch_classes()
     
-    # Step 3: Fetch entities
+    # Step 3: Fetch entities (respect LIMIT_ENTITIES from config)
     send_status("▸ Fetching entities from SPARQL endpoint...")
+    import math
+    max_batches = max(1, math.ceil(LIMIT_ENTITIES / BATCH_SIZE)) if LIMIT_ENTITIES > 0 else None
     fetched_entities = entities.fetch_entities_batch(
         batch_size=BATCH_SIZE,
-        max_batches=None
+        max_batches=max_batches,
     )
+    if LIMIT_ENTITIES > 0:
+        fetched_entities = fetched_entities[:LIMIT_ENTITIES]
     
     if not fetched_entities:
         send_status("⊘ No entities fetched, continuing with schema only...")

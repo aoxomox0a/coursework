@@ -3,30 +3,14 @@ API routes for Graph Indexing
 """
 from fastapi import APIRouter
 from pydantic import BaseModel
-import threading
-from src.indexing.pipeline import run_indexing_pipeline
 from src.indexing import entities, chroma_storage
+from src.indexing.indexing_state import (
+    get_status,
+    is_indexing_in_progress,
+    trigger_background_indexing,
+)
 
 router = APIRouter()
-
-# Global status tracking for real-time updates
-indexing_status = {
-    'is_indexing': False,
-    'current_step': '',
-    'endpoint': '',
-    'error': None
-}
-status_lock = threading.Lock()
-
-
-def update_status(step: str, endpoint: str = None, error: str = None):
-    """Update global indexing status."""
-    with status_lock:
-        indexing_status['current_step'] = step
-        if endpoint:
-            indexing_status['endpoint'] = endpoint
-        if error:
-            indexing_status['error'] = error
 
 
 class IndexRequest(BaseModel):
@@ -39,70 +23,38 @@ class ProgressRequest(BaseModel):
     endpoint: str
 
 
-def run_indexing_background(endpoint: str):
-    """Run indexing pipeline in background with status updates."""
-    try:
-        with status_lock:
-            indexing_status['is_indexing'] = True
-            indexing_status['error'] = None
-        
-        result = run_indexing_pipeline(
-            custom_endpoint=endpoint,
-            status_callback=update_status
-        )
-        
-        if result and isinstance(result, dict):
-            update_status('✓ Indexing completed successfully!', endpoint)
-        else:
-            update_status('✗ Indexing pipeline failed', endpoint, 'Unknown error')
-    except Exception as e:
-        update_status('✗ Indexing failed', endpoint, str(e))
-    finally:
-        with status_lock:
-            indexing_status['is_indexing'] = False
-
-
 @router.post("/index")
 def trigger_indexing(request: IndexRequest):
     """
     Trigger the full indexing pipeline.
+    Skips silently if the endpoint has already been indexed.
     Connects to endpoint, fetches properties/classes/entities, embeds, and stores in ChromaDB.
 
     Args:
         request: IndexRequest with optional 'endpoint' field
 
     Returns:
-        Status confirmation and initial counts
+        Status confirmation
     """
-    # Start indexing in background thread
-    thread = threading.Thread(
-        target=run_indexing_background,
-        args=(request.endpoint,),
-        daemon=True
-    )
-    thread.start()
-    
-    return {
-        "status": "processing",
-        "message": "Indexing started in background"
-    }
+    if chroma_storage.is_endpoint_indexed(request.endpoint):
+        return {"status": "already_indexed", "message": "Endpoint already indexed — skipping"}
+
+    if is_indexing_in_progress():
+        return {"status": "processing", "message": "Indexing already in progress"}
+
+    trigger_background_indexing(request.endpoint)
+    return {"status": "processing", "message": "Indexing started in background"}
 
 
 @router.get("/status")
 def get_indexing_status():
     """
     Get current indexing status for real-time UI updates.
-    
+
     Returns:
         Current status information
     """
-    with status_lock:
-        return {
-            "is_indexing": indexing_status['is_indexing'],
-            "current_step": indexing_status['current_step'],
-            "endpoint": indexing_status['endpoint'],
-            "error": indexing_status['error']
-        }
+    return get_status()
 
 
 @router.post("/counts")

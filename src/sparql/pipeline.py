@@ -1,28 +1,37 @@
 """
-SPARQL Pipeline: Orchestrate SPARQL generation and execution.
+SPARQL Pipeline: Orchestrate prompt generation, LLM call, validation, and execution.
 """
+import logging
+from typing import TypedDict
 from src.sparql import prompt, llm, validation, execution
 
+logger = logging.getLogger(__name__)
 
-def run_sparql_pipeline(question: str, linking_result: dict) -> str:
+
+class SparqlPipelineResult(TypedDict):
+    status: str
+    answer: str
+    sparql_query: str
+    error_message: str | None
+
+
+def run_sparql_pipeline(question: str, linking_result: dict) -> SparqlPipelineResult:
     """
     Execute the complete SPARQL generation & execution pipeline:
-    1. Generate LLM prompt
-    2. Call LLM to generate SPARQL
-    3. Validate syntax
-    4. Retry if invalid (fix attempt)
-    5. Execute query
-    6. Format results
+    1. Validate inputs — return early if no entity URIs
+    2. Build LLM prompt from linked entities and relation
+    3. Call LLM → extract SPARQL from fenced response
+    4. Validate syntax — one retry with fix prompt if invalid
+    5. Execute query on SPARQL endpoint
+    6. Return structured result dict
 
     Args:
         question: Original natural language question
-        linking_result: Output from linking pipeline
+        linking_result: Output from the linking pipeline
 
     Returns:
-        Final answer string
+        SparqlPipelineResult with status, answer, sparql_query, error_message
     """
-    print("Starting SPARQL Pipeline...\n")
-
     entities = linking_result.get("entities", [])
     relation = linking_result.get("relation", {})
     relation_candidates = linking_result.get("relation_candidates", [])
@@ -30,65 +39,60 @@ def run_sparql_pipeline(question: str, linking_result: dict) -> str:
     entity_uris = [e.get("uri") for e in entities if e.get("uri")]
     property_uri = relation.get("uri", "")
 
-    # Step 1: Generate prompt
-    print("1. Generating LLM prompt...")
+    if not entity_uris:
+        logger.warning("No entity URIs available for SPARQL generation")
+        return _error("No entity URIs found in linking result")
+
+    if not property_uri:
+        logger.warning("No property URI available — attempting generation without it")
+
+    related = [c.get("uri") for c in relation_candidates if c.get("uri")]
+
+    # Step 1: Generate prompt and call LLM
+    logger.info("Generating SPARQL prompt for: %s", question)
     sparql_prompt = prompt.generate_sparql_prompt(
         question=question,
         entity_uris=entity_uris,
         property_uri=property_uri,
-        related_properties=relation_candidates
+        related_properties=related,
     )
-    print("✓ Prompt generated")
 
-    # Step 2: Call LLM
-    print("\n2. Calling LLM to generate SPARQL query...")
-    generated_query = llm.call_llm(sparql_prompt)
-    generated_query = llm.extract_sparql_from_response(generated_query)
-    print(f"✓ Generated query:\n{generated_query}\n")
+    raw_response = llm.call_llm(sparql_prompt)
+    generated_query = llm.extract_sparql_from_response(raw_response)
+    logger.info("Generated query:\n%s", generated_query)
 
-    # Step 3: Validate syntax
-    print("3. Validating SPARQL syntax...")
+    # Step 2: Validate — one retry with fix prompt
     is_valid, error_msg = validation.is_valid_sparql(generated_query)
 
     if not is_valid:
-        print(f"✗ Syntax error: {error_msg}")
-
-        # Step 4: Retry with fix prompt
-        print("\n4. Attempting to fix query...")
+        logger.warning("SPARQL validation failed (%s) — retrying with fix prompt", error_msg)
         fix_prompt = prompt.generate_fix_sparql_prompt(question, generated_query, error_msg)
-        fixed_query = llm.call_llm(fix_prompt)
-        fixed_query = llm.extract_sparql_from_response(fixed_query)
-        print(f"✓ Fixed query:\n{fixed_query}\n")
+        raw_response = llm.call_llm(fix_prompt)
+        generated_query = llm.extract_sparql_from_response(raw_response)
 
-        is_valid, error_msg = validation.is_valid_sparql(fixed_query)
+        is_valid, error_msg = validation.is_valid_sparql(generated_query)
         if not is_valid:
-            print(f"✗ Still invalid: {error_msg}")
-            return f"Failed to generate valid SPARQL query. Last error: {error_msg}"
+            logger.error("SPARQL still invalid after retry: %s", error_msg)
+            return _error(f"Failed to generate valid SPARQL query. Last error: {error_msg}")
 
-        generated_query = fixed_query
+    logger.info("Query validated successfully")
 
-    print("✓ Query is valid")
-
-    # Step 5: Execute query
-    print("\n5. Executing query on endpoint...")
+    # Step 3: Execute
     answer = execution.execute_and_format(generated_query)
-    print("✓ Query executed")
+    logger.info("Query executed: %s", answer[:100])
 
-    print("\n6. Final Answer:")
-    print(answer)
+    return SparqlPipelineResult(
+        status="success",
+        answer=answer,
+        sparql_query=generated_query,
+        error_message=None,
+    )
 
-    print("\n✓ SPARQL Pipeline Completed Successfully!")
-    return answer
 
-
-if __name__ == "__main__":
-    # Example usage
-    test_question = "Who is the author of The Great Gatsby?"
-    test_linking_result = {
-        "question": test_question,
-        "entities": [{"uri": "http://example.com/TheGreatGatsby", "confidence": 0.95}],
-        "relation": {"uri": "http://example.com/hasAuthor", "label": "hasAuthor"},
-        "relation_candidates": []
-    }
-
-    answer = run_sparql_pipeline(test_question, test_linking_result)
+def _error(message: str) -> SparqlPipelineResult:
+    return SparqlPipelineResult(
+        status="error",
+        answer="",
+        sparql_query="",
+        error_message=message,
+    )
