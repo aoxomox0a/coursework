@@ -2,14 +2,14 @@
 Link relations in questions to properties in knowledge graph.
 """
 from typing import List, Dict, Any
-import chromadb
-from config.settings import CHROMA_DB_PATH
+from config.settings import SPARQL_ENDPOINT
+from src.indexing.chroma_storage import get_chroma_client, get_collection_name
 
 
 def _get_collection(collection_name: str):
-    """Get collection from ChromaDB."""
-    client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-    return client.get_collection(collection_name)
+    """Get endpoint-scoped collection from the shared ChromaDB client."""
+    scoped_name = get_collection_name(collection_name, SPARQL_ENDPOINT)
+    return get_chroma_client().get_collection(scoped_name)
 
 
 def _query_collection(collection, query_text: str, n_results: int = 5) -> List[Dict[str, Any]]:

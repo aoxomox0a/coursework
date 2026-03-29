@@ -1,17 +1,26 @@
 """ChromaDB Storage - Store and retrieve embeddings from ChromaDB."""
 import os
 import chromadb
-from chromadb.config import Settings
 from urllib.parse import urlparse
 from config.settings import CHROMA_DB_PATH
 
-_CHROMA_SETTINGS = Settings(anonymized_telemetry=False)
+# Disable telemetry before any client is created (avoids capture() exceptions)
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+
+_client = None
 
 
-def _get_client() -> chromadb.PersistentClient:
-    """Return a ChromaDB persistent client with telemetry disabled."""
-    os.makedirs(CHROMA_DB_PATH, exist_ok=True)
-    return chromadb.PersistentClient(path=CHROMA_DB_PATH, settings=_CHROMA_SETTINGS)
+def get_chroma_client():
+    """Return the shared ChromaDB persistent client (process-level singleton)."""
+    global _client
+    if _client is None:
+        os.makedirs(CHROMA_DB_PATH, exist_ok=True)
+        _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    return _client
+
+
+# Internal alias
+_get_client = get_chroma_client
 
 
 def get_endpoint_slug(endpoint: str) -> str:
@@ -195,14 +204,17 @@ def store_entities_in_chroma(entities: list, collection_name: str = "entities", 
             "label": entity["label"]
         })
     
-    # Add to collection
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        documents=documents,
-        metadatas=metadatas
-    )
-    
+    # Add in chunks — ChromaDB rejects batches larger than ~5461
+    _CHROMA_MAX_BATCH = 5000
+    for start in range(0, len(ids), _CHROMA_MAX_BATCH):
+        end = start + _CHROMA_MAX_BATCH
+        collection.add(
+            ids=ids[start:end],
+            embeddings=embeddings[start:end],
+            documents=documents[start:end],
+            metadatas=metadatas[start:end],
+        )
+
     print(f"✓ Stored {len(entities)} entities in ChromaDB")
     return collection
 
