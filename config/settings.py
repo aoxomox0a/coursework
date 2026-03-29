@@ -25,6 +25,14 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "mistral-7b")
 
+# Validate required LLM settings at import time (fail fast rather than silently)
+if not LLM_API_KEY:
+    import warnings
+    warnings.warn("LLM_API_KEY is not set — LLM calls will fail", RuntimeWarning, stacklevel=1)
+if not LLM_ENDPOINT:
+    import warnings
+    warnings.warn("LLM_ENDPOINT is not set — LLM calls will fail", RuntimeWarning, stacklevel=1)
+
 # API Configuration
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", 8000))

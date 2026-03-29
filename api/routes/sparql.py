@@ -1,38 +1,55 @@
 """
-API routes for SPARQL Generation & Execution
+API routes for SPARQL Generation & Execution — Topic 3.
 """
-from fastapi import APIRouter
-from pydantic import BaseModel
+import logging
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from src.sparql.pipeline import run_sparql_pipeline
 from src.linking.pipeline import run_linking_pipeline
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 class AnswerRequest(BaseModel):
-    """Request model for getting answer."""
+    question: str = Field(..., min_length=1, max_length=1000, description="Natural language question")
+
+
+class AnswerResponse(BaseModel):
+    status: str
     question: str
+    answer: str
+    error: str | None = None
 
 
-@router.post("/answer")
-def get_answer(request: AnswerRequest):
+@router.post("/answer", response_model=AnswerResponse)
+def get_answer(request: AnswerRequest) -> AnswerResponse:
     """
-    End-to-end: Link entities, generate SPARQL, execute, and return answer.
+    End-to-end NL-to-SPARQL: link entities, generate SPARQL, execute, return answer.
 
     Args:
-        request: AnswerRequest with 'question' field
+        request: AnswerRequest with 'question' field (non-empty string)
 
     Returns:
-        Final answer string
+        AnswerResponse with status, question, answer, and optional error
     """
-    # Step 1: Run linking pipeline
-    linking_result = run_linking_pipeline(request.question)
+    try:
+        linking_result = run_linking_pipeline(request.question)
+        result = run_sparql_pipeline(request.question, linking_result)
+    except Exception as exc:
+        logger.error("Pipeline error for question '%s': %s", request.question, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
-    # Step 2: Run SPARQL generation and execution
-    answer = run_sparql_pipeline(request.question, linking_result)
+    if result["status"] == "error":
+        return AnswerResponse(
+            status="error",
+            question=request.question,
+            answer="",
+            error=result.get("error_message"),
+        )
 
-    return {
-        "status": "success",
-        "question": request.question,
-        "answer": answer
-    }
+    return AnswerResponse(
+        status="success",
+        question=request.question,
+        answer=result["answer"],
+    )

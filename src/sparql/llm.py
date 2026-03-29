@@ -1,77 +1,94 @@
 """
-Call LLM for SPARQL generation.
+Call LLM for SPARQL generation via Hactar (OpenAI-compatible /chat/completions endpoint).
 """
+import re
+import logging
 import requests
 from config.settings import LLM_ENDPOINT, LLM_API_KEY, LLM_MODEL
+
+logger = logging.getLogger(__name__)
+
+_SPARQL_FENCE_RE = re.compile(r"```(?:sparql)?\s*\n?(.*?)```", re.DOTALL)
+_SPARQL_KEYWORD_RE = re.compile(
+    r"\b(PREFIX|SELECT|CONSTRUCT|ASK|DESCRIBE)\b", re.IGNORECASE
+)
 
 
 def call_llm(prompt: str) -> str:
     """
-    Call external LLM (HuggingFace, Replicate, or custom endpoint).
+    Call Hactar LLM via OpenAI-compatible /chat/completions endpoint.
 
     Args:
-        prompt: The prompt to send to LLM
+        prompt: The prompt to send to the LLM
 
     Returns:
-        Generated SPARQL query string
+        Raw generated text from the LLM, or empty string on failure
     """
+    headers = {
+        "Authorization": f"Bearer {LLM_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 512,
+    }
+
     try:
-        # Example for HuggingFace Inference API
-        headers = {"Authorization": f"Bearer {LLM_API_KEY}"}
-
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 500,
-                "temperature": 0.1,  # Low temperature for deterministic output
-            }
-        }
-
         response = requests.post(
-            LLM_ENDPOINT,
+            f"{LLM_ENDPOINT}/chat/completions",
             headers=headers,
             json=payload,
-            timeout=30
+            timeout=60,
         )
 
         if response.status_code == 200:
-            result = response.json()
-            # Extract generated text (format varies by provider)
-            generated = result[0].get("generated_text", "")
-            # Remove prompt from response
-            sparql_query = generated.replace(prompt, "").strip()
-            return sparql_query
-        else:
-            print(f"LLM Error: {response.status_code}")
-            return ""
+            try:
+                return response.json()["choices"][0]["message"]["content"]
+            except (KeyError, IndexError) as exc:
+                logger.error("Unexpected LLM response shape: %s — body: %.200s", exc, response.text)
+                return ""
 
-    except Exception as e:
-        print(f"Error calling LLM: {e}")
+        logger.error("LLM returned status %d: %s", response.status_code, response.text[:200])
+        return ""
+
+    except requests.exceptions.Timeout:
+        logger.error("LLM request timed out")
+        return ""
+    except requests.exceptions.RequestException as exc:
+        logger.error("LLM HTTP error: %s", exc)
+        return ""
+    except Exception as exc:
+        logger.error("Unexpected error calling LLM: %s", exc)
         return ""
 
 
 def extract_sparql_from_response(response_text: str) -> str:
     """
-    Extract SPARQL query from LLM response.
-    Handles cases where LLM returns extra text.
+    Extract a SPARQL query from LLM response text.
+
+    Tries two strategies in order:
+    1. Regex extraction from ```sparql ... ``` or ``` ... ``` fences.
+    2. Fallback: keyword scan from first PREFIX/SELECT/CONSTRUCT/ASK/DESCRIBE line.
 
     Args:
-        response_text: Raw response from LLM
+        response_text: Raw text returned by the LLM
 
     Returns:
-        Extracted SPARQL query
+        Extracted SPARQL query string, or empty string if none found
     """
-    # Look for SELECT, CONSTRUCT, ASK, DESCRIBE keywords
-    lines = response_text.split("\n")
-    sparql_lines = []
-    in_query = False
+    if not response_text:
+        return ""
 
-    for line in lines:
-        upper_line = line.upper().strip()
-        if upper_line.startswith(("SELECT", "CONSTRUCT", "ASK", "DESCRIBE", "PREFIX")):
-            in_query = True
+    # Strategy 1: fenced code block
+    match = _SPARQL_FENCE_RE.search(response_text)
+    if match:
+        return match.group(1).strip()
 
-        if in_query:
-            sparql_lines.append(line)
+    # Strategy 2: keyword scan fallback
+    kw_match = _SPARQL_KEYWORD_RE.search(response_text)
+    if kw_match:
+        return response_text[kw_match.start():].strip()
 
-    return "\n".join(sparql_lines)
+    return ""

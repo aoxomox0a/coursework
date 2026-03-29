@@ -34,4 +34,22 @@ chroma.sqlite3
 .idea/
 .DS_Store
 Thumbs.db
-=======
+
+# =========================
+# 5. Claude Code
+# =========================
+.claude/
+
+# =========================
+# 6. Testing & Coverage
+# =========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# =========================
+# 7. Ruff
+# =========================
+.ruff_cache/
