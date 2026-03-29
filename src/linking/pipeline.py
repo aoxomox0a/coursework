@@ -60,8 +60,7 @@ def run_linking_pipeline(question: str):
 
 
 if __name__ == "__main__":
-    test_questions = [
-        "Who directed the movie Inception released in 2010?",
-    ]
+    # run_linking_pipeline expects a single str, not a list
+    test_question = "Who directed the movie Inception released in 2010?"
     # test_question = "Who is the author of The Great Gatsby?"
-    result = run_linking_pipeline(test_questions)
+    result = run_linking_pipeline(test_question)
