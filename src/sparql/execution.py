@@ -1,46 +1,45 @@
 """
 Execute SPARQL queries on endpoint and format results.
 """
+
 import logging
 import requests
 from typing import Any
 from config.settings import SPARQL_ENDPOINT
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
 _ACCEPT_JSON = "application/sparql-results+json"
 
 
-def execute_query(
+async def execute_query(
     query: str,
     endpoint_url: str = SPARQL_ENDPOINT,
 ) -> dict[str, Any]:
-    """
-    Execute SPARQL query on endpoint.
 
-    Args:
-        query: Valid SPARQL query string
-        endpoint_url: SPARQL endpoint URL
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                endpoint_url,
+                params={"query": query, "format": "json"},
+                headers={"Accept": _ACCEPT_JSON},
+                timeout=60,
+            )
 
-    Returns:
-        Dict with results or error info
-    """
-    try:
-        response = requests.get(
-            endpoint_url,
-            params={"query": query, "format": "json"},
-            headers={"Accept": _ACCEPT_JSON},
-            timeout=60,
-        )
+            if response.status_code == 200:
+                return response.json()
 
-        if response.status_code == 200:
-            return response.json()
-
-        logger.error("SPARQL endpoint returned %d for query: %.100s", response.status_code, query)
-        return {"error": f"Endpoint returned {response.status_code}"}
-    except Exception as exc:
-        logger.error("Error executing SPARQL query: %s", exc)
-        return {"error": str(exc)}
+            logger.error(
+                "SPARQL endpoint returned %d for query: %.100s",
+                response.status_code,
+                query,
+            )
+            return {"error": f"Endpoint returned {response.status_code}"}
+        except Exception as exc:
+            logger.error("Error executing SPARQL query: %s", exc)
+            return {"error": str(exc)}
 
 
 def format_results(results_json: dict[str, Any]) -> str:
@@ -63,13 +62,15 @@ def format_results(results_json: dict[str, Any]) -> str:
 
     lines = []
     for i, binding in enumerate(bindings, 1):
-        items = [f"{var}: {val_obj.get('value', '')}" for var, val_obj in binding.items()]
+        items = [
+            f"{var}: {val_obj.get('value', '')}" for var, val_obj in binding.items()
+        ]
         lines.append(f"{i}. {', '.join(items)}")
 
     return "\n".join(lines)
 
 
-def execute_and_format(
+async def execute_and_format(
     query: str,
     endpoint_url: str = SPARQL_ENDPOINT,
 ) -> str:
@@ -83,5 +84,5 @@ def execute_and_format(
     Returns:
         Formatted results string
     """
-    results = execute_query(query, endpoint_url)
+    results = await execute_query(query, endpoint_url)
     return format_results(results)

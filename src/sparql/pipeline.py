@@ -1,9 +1,11 @@
 """
 SPARQL Pipeline: Orchestrate prompt generation, LLM call, validation, and execution.
 """
+
 import logging
-from typing import TypedDict
+from typing import TypedDict, Dict, List
 from src.sparql import prompt, llm, validation, execution
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +17,27 @@ class SparqlPipelineResult(TypedDict):
     error_message: str | None
 
 
-def run_sparql_pipeline(question: str, linking_result: dict) -> SparqlPipelineResult:
+async def run_batch_sparql_pipeline(
+    questions: List[Dict],
+) -> List[SparqlPipelineResult]:
+    tasks = []
+    for item in questions:
+        question = item["question"]
+        linking_result = item["linking_result"]
+
+        # We don't await here, we just queue it up
+        tasks.append(run_sparql_pipeline(question, linking_result))
+
+    # 2. FIRE THEM ALL AT THE EXACT SAME TIME
+    # This is where the magic happens. 50 LLM calls and 50 DB queries run concurrently.
+    results = await asyncio.gather(*tasks)
+
+    return results
+
+
+async def run_sparql_pipeline(
+    question: str, linking_result: dict
+) -> SparqlPipelineResult:
     """
     Execute the complete SPARQL generation & execution pipeline:
     1. Validate inputs — return early if no entity URIs
@@ -57,7 +79,7 @@ def run_sparql_pipeline(question: str, linking_result: dict) -> SparqlPipelineRe
         related_properties=related,
     )
 
-    raw_response = llm.call_llm(sparql_prompt)
+    raw_response = await llm.call_llm(sparql_prompt)
     generated_query = llm.extract_sparql_from_response(raw_response)
     logger.info("Generated query:\n%s", generated_query)
 
@@ -65,20 +87,26 @@ def run_sparql_pipeline(question: str, linking_result: dict) -> SparqlPipelineRe
     is_valid, error_msg = validation.is_valid_sparql(generated_query)
 
     if not is_valid:
-        logger.warning("SPARQL validation failed (%s) — retrying with fix prompt", error_msg)
-        fix_prompt = prompt.generate_fix_sparql_prompt(question, generated_query, error_msg)
-        raw_response = llm.call_llm(fix_prompt)
+        logger.warning(
+            "SPARQL validation failed (%s) — retrying with fix prompt", error_msg
+        )
+        fix_prompt = prompt.generate_fix_sparql_prompt(
+            question, generated_query, error_msg
+        )
+        raw_response = await llm.call_llm(fix_prompt)
         generated_query = llm.extract_sparql_from_response(raw_response)
 
         is_valid, error_msg = validation.is_valid_sparql(generated_query)
         if not is_valid:
             logger.error("SPARQL still invalid after retry: %s", error_msg)
-            return _error(f"Failed to generate valid SPARQL query. Last error: {error_msg}")
+            return _error(
+                f"Failed to generate valid SPARQL query. Last error: {error_msg}"
+            )
 
     logger.info("Query validated successfully")
 
     # Step 3: Execute
-    answer = execution.execute_and_format(generated_query)
+    answer = await execution.execute_and_format(generated_query)
     logger.info("Query executed: %s", answer[:100])
 
     return SparqlPipelineResult(

@@ -1,6 +1,7 @@
 """
 API routes for SPARQL Generation & Execution — Topic 3.
 """
+
 import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -9,14 +10,19 @@ from config.settings import SPARQL_ENDPOINT
 from src.sparql.pipeline import run_sparql_pipeline
 from src.linking.pipeline import run_linking_pipeline
 from src.indexing.chroma_storage import is_endpoint_indexed
-from src.indexing.indexing_state import is_indexing_in_progress, trigger_background_indexing
+from src.indexing.indexing_state import (
+    is_indexing_in_progress,
+    trigger_background_indexing,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 class AnswerRequest(BaseModel):
-    question: str = Field(..., min_length=1, max_length=1000, description="Natural language question")
+    question: str = Field(
+        ..., min_length=1, max_length=1000, description="Natural language question"
+    )
 
 
 class AnswerResponse(BaseModel):
@@ -27,7 +33,7 @@ class AnswerResponse(BaseModel):
 
 
 @router.post("/answer")
-def get_answer(request: AnswerRequest):
+async def get_answer(request: AnswerRequest):
     """
     End-to-end NL-to-SPARQL: link entities, generate SPARQL, execute, return answer.
 
@@ -50,7 +56,9 @@ def get_answer(request: AnswerRequest):
                     "message": "Endpoint indexing is in progress. Please retry in a few minutes.",
                 },
             )
-        logger.info("Endpoint %s not indexed — triggering auto-indexing", SPARQL_ENDPOINT)
+        logger.info(
+            "Endpoint %s not indexed — triggering auto-indexing", SPARQL_ENDPOINT
+        )
         trigger_background_indexing(SPARQL_ENDPOINT)
         return JSONResponse(
             status_code=202,
@@ -65,7 +73,7 @@ def get_answer(request: AnswerRequest):
 
     try:
         linking_result = run_linking_pipeline(request.question)
-        result = run_sparql_pipeline(request.question, linking_result)
+        result = await run_sparql_pipeline(request.question, linking_result)
     except Exception as exc:
         logger.error("Pipeline error for question '%s': %s", request.question, exc)
         return JSONResponse(status_code=500, content={"detail": str(exc)})
