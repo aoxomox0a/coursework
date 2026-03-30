@@ -14,6 +14,7 @@ from src.indexing.indexing_state import (
     is_indexing_in_progress,
     trigger_background_indexing,
 )
+import asyncio
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -72,7 +73,8 @@ async def get_answer(request: AnswerRequest):
         )
 
     try:
-        linking_result = run_linking_pipeline(request.question)
+        # Offload CPU-bound NLP math to a background thread to prevent blocking the FastAPI event loop
+        linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
         result = await run_sparql_pipeline(request.question, linking_result)
     except Exception as exc:
         logger.error("Pipeline error for question '%s': %s", request.question, exc)
