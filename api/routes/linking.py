@@ -1,6 +1,7 @@
 """
 API routes for Entity & Relation Linking
 """
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from src.linking.pipeline import run_linking_pipeline
@@ -10,6 +11,8 @@ router = APIRouter()
 
 class QuestionRequest(BaseModel):
     """Request model for linking."""
+
+    # keep this
     question: str
 
 
@@ -24,12 +27,17 @@ def link_entities_and_relations(request: QuestionRequest):
     Returns:
         Linked entities and relations
     """
-    result = run_linking_pipeline(request.question)
+    question = request.question
+    # create list
+    batch_input = [question]
+    full_result = run_linking_pipeline(batch_input)
+
+    result = full_result[0]
 
     return {
         "status": "success",
         "question": result["question"],
         "entities": result["entities"],
         "relation": result["relation"],
-        "relation_candidates": result["relation_candidates"]
+        "relation_candidates": result["relation_candidates"],
     }

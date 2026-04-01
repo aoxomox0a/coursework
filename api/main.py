@@ -1,14 +1,15 @@
 """FastAPI application for NL-to-SPARQL system."""
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from api.routes import indexing, sparql
+from api.routes import indexing, sparql, linking
 
 app = FastAPI(
     title="NL-to-SPARQL API",
     description="Convert natural language questions to SPARQL queries",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # Enable CORS for frontend
@@ -23,6 +24,7 @@ app.add_middleware(
 # Include routes
 app.include_router(indexing.router, prefix="/api")
 app.include_router(sparql.router, prefix="/api")
+app.include_router(linking.router, prefix="/api")
 
 
 class IndexRequest(BaseModel):
@@ -45,4 +47,5 @@ def health():
 if __name__ == "__main__":
     import uvicorn
     from config.settings import API_HOST, API_PORT
+
     uvicorn.run(app, host=API_HOST, port=API_PORT)

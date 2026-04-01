@@ -1,6 +1,7 @@
 """
 SPARQL Pipeline: Orchestrate prompt generation, LLM call, validation, and execution.
 """
+
 import logging
 from typing import TypedDict
 from src.sparql import prompt, llm, validation, execution
@@ -15,7 +16,9 @@ class SparqlPipelineResult(TypedDict):
     error_message: str | None
 
 
-def run_sparql_pipeline(question: str, linking_result: dict) -> SparqlPipelineResult:
+async def run_sparql_pipeline(
+    question: str, linking_result: dict
+) -> SparqlPipelineResult:
     """
     Execute the complete SPARQL generation & execution pipeline:
     1. Validate inputs — return early if no entity URIs
@@ -65,15 +68,21 @@ def run_sparql_pipeline(question: str, linking_result: dict) -> SparqlPipelineRe
     is_valid, error_msg = validation.is_valid_sparql(generated_query)
 
     if not is_valid:
-        logger.warning("SPARQL validation failed (%s) — retrying with fix prompt", error_msg)
-        fix_prompt = prompt.generate_fix_sparql_prompt(question, generated_query, error_msg)
+        logger.warning(
+            "SPARQL validation failed (%s) — retrying with fix prompt", error_msg
+        )
+        fix_prompt = prompt.generate_fix_sparql_prompt(
+            question, generated_query, error_msg
+        )
         raw_response = llm.call_llm(fix_prompt)
         generated_query = llm.extract_sparql_from_response(raw_response)
 
         is_valid, error_msg = validation.is_valid_sparql(generated_query)
         if not is_valid:
             logger.error("SPARQL still invalid after retry: %s", error_msg)
-            return _error(f"Failed to generate valid SPARQL query. Last error: {error_msg}")
+            return _error(
+                f"Failed to generate valid SPARQL query. Last error: {error_msg}"
+            )
 
     logger.info("Query validated successfully")
 
