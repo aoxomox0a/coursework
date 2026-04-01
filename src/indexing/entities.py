@@ -1,7 +1,7 @@
 """Entity Fetching - Fetch entities and labels from DBpedia."""
 
 from src.indexing.endpoint import query_sparql
-from config.settings import LIMIT_ENTITIES
+from config.settings import LIMIT_ENTITIES, DEFAULT_MAX_BATCHES
 import asyncio
 
 
@@ -278,7 +278,9 @@ async def fetch_class_entity_mappings(limit: int = None) -> list:
     return mappings
 
 
-async def fetch_entities_batch(batch_size: int = 1000, max_batches: int = None) -> list:
+async def fetch_entities_batch(
+    batch_size: int = 1000, max_batches: int = DEFAULT_MAX_BATCHES
+) -> list:
     """
     Fetch entities in batches with pagination.
 
@@ -292,12 +294,6 @@ async def fetch_entities_batch(batch_size: int = 1000, max_batches: int = None) 
     all_entities = []
     offset = 0
     batch_count = 0
-
-    if max_batches is None:
-        print(
-            "⚠ No max_batches provided. Defaulting to a safe limit of 50 batches (50,000 entities) to prevent memory overload."
-        )
-        max_batches = 50
 
     print(f"Fetching entities in batches (batch_size: {batch_size})...")
 

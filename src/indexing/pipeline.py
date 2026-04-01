@@ -4,6 +4,7 @@ from src.indexing import endpoint, entities, embedding, chroma_storage
 from config.settings import BATCH_SIZE, LIMIT_ENTITIES
 import asyncio
 from typing import Dict
+import math
 
 
 async def run_indexing_pipeline(
@@ -57,12 +58,12 @@ async def run_indexing_pipeline(
     send_status("▸ Fetching entities from SPARQL endpoint...")
     import math
 
-    max_batches = (
+    required_batches = (
         max(1, math.ceil(LIMIT_ENTITIES / BATCH_SIZE)) if LIMIT_ENTITIES > 0 else None
     )
     fetched_entities = await entities.fetch_entities_batch(
         batch_size=BATCH_SIZE,
-        max_batches=max_batches,
+        max_batches=required_batches,
     )
     if LIMIT_ENTITIES > 0:
         fetched_entities = fetched_entities[:LIMIT_ENTITIES]
