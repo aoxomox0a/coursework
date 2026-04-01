@@ -4,8 +4,10 @@ Shared indexing state and background indexing trigger.
 Centralises mutable state so both the indexing route and the SPARQL route
 can check / update indexing progress without importing from each other.
 """
+
 import threading
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,9 @@ def trigger_background_indexing(endpoint: str) -> None:
     Start the full indexing pipeline in a background thread.
     No-op if indexing is already running.
     """
-    from src.indexing.pipeline import run_indexing_pipeline  # lazy — avoids circular import
+    from src.indexing.pipeline import (
+        run_indexing_pipeline,
+    )  # lazy — avoids circular import
 
     with _lock:
         if _status["is_indexing"]:
@@ -53,7 +57,11 @@ def trigger_background_indexing(endpoint: str) -> None:
 
     def _run() -> None:
         try:
-            run_indexing_pipeline(custom_endpoint=endpoint, status_callback=update_status)
+            asyncio.run(
+                run_indexing_pipeline(
+                    custom_endpoint=endpoint, status_callback=update_status
+                )
+            )
             update_status("✓ Indexing completed successfully!", endpoint)
         except Exception as exc:
             update_status("✗ Indexing failed", endpoint, str(exc))
