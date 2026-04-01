@@ -11,6 +11,10 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
     print(f"Starting Linking Pipeline...")
     print(f"Question: {questions}\n")
 
+    # pass string into list is single string
+    if isinstance(questions, str):
+        questions = [questions]
+
     print("1. Loading spaCy model...")
     nlp = spacy_setup.load_spacy_model()
     result = []
@@ -21,7 +25,8 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
             extracted_entities = entity_extraction.extract_entities(doc)
             noun_phrases = entity_extraction.extract_noun_phrases(doc)
 
-            linking_results = entity_linking.link_entities(noun_phrases)
+            entity_strings = [ent[0] for ent in extracted_entities]
+            linking_results = entity_linking.link_entities(entity_strings)
             entity_uris = entity_linking.disambiguate_entities(linking_results)
 
             relation_candidates = relation_linking.find_relation_candidates(
