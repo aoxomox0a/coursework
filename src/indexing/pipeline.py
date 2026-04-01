@@ -137,4 +137,4 @@ async def run_indexing_pipeline(
 
 
 if __name__ == "__main__":
-    run_indexing_pipeline()
+    asyncio.run(run_indexing_pipeline())
