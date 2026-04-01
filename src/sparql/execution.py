@@ -19,7 +19,7 @@ async def execute_query(
     endpoint_url: str = SPARQL_ENDPOINT,
 ) -> dict[str, Any]:
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
             response = await client.get(
                 endpoint_url,
