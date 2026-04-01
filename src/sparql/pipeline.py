@@ -17,24 +17,6 @@ class SparqlPipelineResult(TypedDict):
     error_message: str | None
 
 
-async def run_batch_sparql_pipeline(
-    questions: List[Dict],
-) -> List[SparqlPipelineResult]:
-    tasks = []
-    for item in questions:
-        question = item["question"]
-        linking_result = item["linking_result"]
-
-        # We don't await here, we just queue it up
-        tasks.append(run_sparql_pipeline(question, linking_result))
-
-    # 2. FIRE THEM ALL AT THE EXACT SAME TIME
-    # This is where the magic happens. 50 LLM calls and 50 DB queries run concurrently.
-    results = await asyncio.gather(*tasks)
-
-    return results
-
-
 async def run_sparql_pipeline(
     question: str, linking_result: dict
 ) -> SparqlPipelineResult:

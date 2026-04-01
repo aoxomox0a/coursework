@@ -73,9 +73,9 @@ async def get_answer(request: AnswerRequest):
         )
 
     try:
-        # Offload CPU-bound NLP math to a background thread to prevent blocking the FastAPI event loop
         linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
-        result = await run_sparql_pipeline(request.question, linking_result)
+        single_linking_result = linking_result[0]
+        result = await run_sparql_pipeline(request.question, single_linking_result)
     except Exception as exc:
         logger.error("Pipeline error for question '%s': %s", request.question, exc)
         return JSONResponse(status_code=500, content={"detail": str(exc)})
