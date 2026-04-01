@@ -3,8 +3,9 @@ SPARQL Pipeline: Orchestrate prompt generation, LLM call, validation, and execut
 """
 
 import logging
-from typing import TypedDict
+from typing import TypedDict, Dict, List
 from src.sparql import prompt, llm, validation, execution
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ async def run_sparql_pipeline(
         related_properties=related,
     )
 
-    raw_response = llm.call_llm(sparql_prompt)
+    raw_response = await llm.call_llm(sparql_prompt)
     generated_query = llm.extract_sparql_from_response(raw_response)
     logger.info("Generated query:\n%s", generated_query)
 
@@ -74,7 +75,7 @@ async def run_sparql_pipeline(
         fix_prompt = prompt.generate_fix_sparql_prompt(
             question, generated_query, error_msg
         )
-        raw_response = llm.call_llm(fix_prompt)
+        raw_response = await llm.call_llm(fix_prompt)
         generated_query = llm.extract_sparql_from_response(raw_response)
 
         is_valid, error_msg = validation.is_valid_sparql(generated_query)
@@ -87,7 +88,7 @@ async def run_sparql_pipeline(
     logger.info("Query validated successfully")
 
     # Step 3: Execute
-    answer = execution.execute_and_format(generated_query)
+    answer = await execution.execute_and_format(generated_query)
     logger.info("Query executed: %s", answer[:100])
 
     return SparqlPipelineResult(

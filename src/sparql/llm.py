@@ -1,10 +1,13 @@
 """
 Call LLM for SPARQL generation via Hactar (OpenAI-compatible /chat/completions endpoint).
 """
+
 import re
 import logging
 import requests
 from config.settings import LLM_ENDPOINT, LLM_API_KEY, LLM_MODEL
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +17,7 @@ _SPARQL_KEYWORD_RE = re.compile(
 )
 
 
-def call_llm(prompt: str) -> str:
+async def call_llm(prompt: str) -> str:
     """
     Call Hactar LLM via OpenAI-compatible /chat/completions endpoint.
 
@@ -35,33 +38,40 @@ def call_llm(prompt: str) -> str:
         "max_tokens": 512,
     }
 
-    try:
-        response = requests.post(
-            f"{LLM_ENDPOINT}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60,
-        )
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{LLM_ENDPOINT}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=60,
+            )
 
-        if response.status_code == 200:
-            try:
-                return response.json()["choices"][0]["message"]["content"]
-            except (KeyError, IndexError) as exc:
-                logger.error("Unexpected LLM response shape: %s — body: %.200s", exc, response.text)
-                return ""
+            if response.status_code == 200:
+                try:
+                    return response.json()["choices"][0]["message"]["content"]
+                except (KeyError, IndexError) as exc:
+                    logger.error(
+                        "Unexpected LLM response shape: %s — body: %.200s",
+                        exc,
+                        response.text,
+                    )
+                    return ""
 
-        logger.error("LLM returned status %d: %s", response.status_code, response.text[:200])
-        return ""
+            logger.error(
+                "LLM returned status %d: %s", response.status_code, response.text[:200]
+            )
+            return ""
 
-    except requests.exceptions.Timeout:
-        logger.error("LLM request timed out")
-        return ""
-    except requests.exceptions.RequestException as exc:
-        logger.error("LLM HTTP error: %s", exc)
-        return ""
-    except Exception as exc:
-        logger.error("Unexpected error calling LLM: %s", exc)
-        return ""
+        except requests.exceptions.Timeout:
+            logger.error("LLM request timed out")
+            return ""
+        except httpx.RequestError as exc:
+            logger.error("LLM HTTP error: %s", exc)
+            return ""
+        except Exception as exc:
+            logger.error("Unexpected error calling LLM: %s", exc)
+            return ""
 
 
 def extract_sparql_from_response(response_text: str) -> str:
@@ -89,6 +99,6 @@ def extract_sparql_from_response(response_text: str) -> str:
     # Strategy 2: keyword scan fallback
     kw_match = _SPARQL_KEYWORD_RE.search(response_text)
     if kw_match:
-        return response_text[kw_match.start():].strip()
+        return response_text[kw_match.start() :].strip()
 
     return ""
