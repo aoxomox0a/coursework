@@ -47,4 +47,4 @@ API_PORT = int(os.getenv("API_PORT", 8000))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
 LIMIT_ENTITIES = int(os.getenv("LIMIT_ENTITIES", "10000"))  # -1 for no limit
 
-DEFAULT_MAX_BATCHES = 50
+DEFAULT_MAX_BATCHES = int(os.getenv("DEFAULT_MAX_BATCHES", "50"))
