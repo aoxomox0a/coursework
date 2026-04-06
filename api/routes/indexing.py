@@ -1,13 +1,16 @@
 """
 API routes for Graph Indexing
 """
-from fastapi import APIRouter
+
+from fastapi import APIRouter, status, BackgroundTasks
 from pydantic import BaseModel
 from src.indexing import entities, chroma_storage
+from src.indexing.pipeline import run_indexing_pipeline
 from src.indexing.indexing_state import (
     get_status,
     is_indexing_in_progress,
-    trigger_background_indexing,
+    update_status,
+    toggle_indexing_state,
 )
 
 router = APIRouter()
@@ -15,16 +18,35 @@ router = APIRouter()
 
 class IndexRequest(BaseModel):
     """Request model for indexing."""
+
     endpoint: str = None
 
 
 class ProgressRequest(BaseModel):
     """Request model for progress info."""
+
     endpoint: str
 
 
+# create async wrapper to manage the UI state while the background task runs
+async def managed_indexing_task(endpoint: str):
+    toggle_indexing_state(True)
+    update_status("Starting indexing...", endpoint)
+    try:
+        # We must await the async pipeline now!
+        await run_indexing_pipeline(
+            custom_endpoint=endpoint, status_callback=update_status
+        )
+        update_status("✓ Indexing completed successfully!", endpoint)
+    except Exception as exc:
+        update_status("✗ Indexing failed", endpoint, str(exc))
+    finally:
+        # Crucial: Ensure the UI knows we finished, even if it crashed
+        toggle_indexing_state(False)
+
+
 @router.post("/index")
-def trigger_indexing(request: IndexRequest):
+def trigger_indexing(request: IndexRequest, background_tasks: BackgroundTasks):
     """
     Trigger the full indexing pipeline.
     Skips silently if the endpoint has already been indexed.
@@ -37,12 +59,15 @@ def trigger_indexing(request: IndexRequest):
         Status confirmation
     """
     if chroma_storage.is_endpoint_indexed(request.endpoint):
-        return {"status": "already_indexed", "message": "Endpoint already indexed — skipping"}
+        return {
+            "status": "already_indexed",
+            "message": "Endpoint already indexed — skipping",
+        }
 
     if is_indexing_in_progress():
         return {"status": "processing", "message": "Indexing already in progress"}
 
-    trigger_background_indexing(request.endpoint)
+    background_tasks.add_task(managed_indexing_task, request.endpoint)
     return {"status": "processing", "message": "Indexing started in background"}
 
 
@@ -61,15 +86,17 @@ def get_indexing_status():
 def get_collection_counts(request: ProgressRequest):
     """
     Get current counts from all ChromaDB collections for a specific endpoint.
-    
+
     Args:
         request: ProgressRequest with 'endpoint' field
-    
+
     Returns:
         Current indexed counts
     """
     try:
-        chroma_counts = chroma_storage.get_all_collection_counts(endpoint=request.endpoint)
+        chroma_counts = chroma_storage.get_all_collection_counts(
+            endpoint=request.endpoint
+        )
         return {
             "status": "success",
             "counts": {
@@ -77,8 +104,8 @@ def get_collection_counts(request: ProgressRequest):
                 "properties": chroma_counts.get("properties", 0),
                 "classes": chroma_counts.get("classes", 0),
                 "sample_triples": chroma_counts.get("sample_triples", 0),
-                "class_entity_mappings": chroma_counts.get("class_entity_mappings", 0)
-            }
+                "class_entity_mappings": chroma_counts.get("class_entity_mappings", 0),
+            },
         }
     except Exception as e:
         return {
@@ -89,8 +116,8 @@ def get_collection_counts(request: ProgressRequest):
                 "properties": 0,
                 "classes": 0,
                 "sample_triples": 0,
-                "class_entity_mappings": 0
-            }
+                "class_entity_mappings": 0,
+            },
         }
 
 
@@ -98,33 +125,33 @@ def get_collection_counts(request: ProgressRequest):
 def get_progress(request: ProgressRequest):
     """
     Get indexing progress: total entities and currently indexed count.
-    
+
     Args:
         request: ProgressRequest with 'endpoint' field
-        
+
     Returns:
         Total entities, indexed count, and progress percentage
     """
     try:
         # Get total count from SPARQL endpoint
         total_count = entities.get_total_entity_count(request.endpoint)
-        print("/progress f{total_count} entities found at endpoint {request.endpoint}")
-        
+        print(f"/progress {total_count} entities found at endpoint {request.endpoint}")
+
         # Get current count from ChromaDB
         try:
             indexed_count = chroma_storage.get_indexed_count()
         except:
             indexed_count = 0
-        
+
         progress = 0
         if total_count > 0:
             progress = int((indexed_count / total_count) * 100)
-        
+
         return {
             "status": "success",
             "total": total_count,
             "indexed": indexed_count,
-            "progress": progress
+            "progress": progress,
         }
     except Exception as e:
         return {
@@ -132,5 +159,5 @@ def get_progress(request: ProgressRequest):
             "message": str(e),
             "total": 0,
             "indexed": 0,
-            "progress": 0
+            "progress": 0,
         }
