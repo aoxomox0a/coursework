@@ -29,6 +29,8 @@ QUESTIONS=(
   "What is the capital of France?"
   "When was Barack Obama born?"
   "Where is the Eiffel Tower located?"
+  "What is the time zone of Salt Lake City?"
+  "Is Berlin the capital of Germany?"
 )
 
 for q in "${QUESTIONS[@]}"; do
