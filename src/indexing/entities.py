@@ -307,6 +307,7 @@ async def fetch_entities_batch(
         WHERE {{
             ?entity rdfs:label ?label ;
                     rdf:type ?type .
+                    FILTER (lang(?label) = 'en')
         }}
         LIMIT {batch_size}
         OFFSET {offset}
