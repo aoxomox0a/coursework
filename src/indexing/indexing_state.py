@@ -20,6 +20,12 @@ _status: dict = {
 _lock = threading.Lock()
 
 
+def toggle_indexing_state(is_active: bool):
+    """Safely toggle the indexing status lock for the UI."""
+    with _lock:
+        _status["is_indexing"] = is_active
+
+
 def update_status(step: str, endpoint: str = None, error: str = None) -> None:
     with _lock:
         _status["current_step"] = step

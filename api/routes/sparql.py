@@ -4,16 +4,16 @@ API routes for SPARQL Generation & Execution — Topic 3.
 
 import logging
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from config.settings import SPARQL_ENDPOINT
 from src.sparql.pipeline import run_sparql_pipeline
 from src.linking.pipeline import run_linking_pipeline
+from api.routes.indexing import managed_indexing_task
 from src.indexing.chroma_storage import is_endpoint_indexed
 from src.indexing.indexing_state import (
     is_indexing_in_progress,
-    trigger_background_indexing,
 )
 import asyncio
 
@@ -36,7 +36,7 @@ class AnswerResponse(BaseModel):
 
 
 @router.post("/answer")
-async def get_answer(request: AnswerRequest):
+async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
     """
     End-to-end NL-to-SPARQL: link entities, generate SPARQL, execute, return answer.
 
@@ -62,7 +62,8 @@ async def get_answer(request: AnswerRequest):
         logger.info(
             "Endpoint %s not indexed — triggering auto-indexing", SPARQL_ENDPOINT
         )
-        trigger_background_indexing(SPARQL_ENDPOINT)
+        # replace legacy call with managed background task
+        background_tasks.add_task(managed_indexing_task, SPARQL_ENDPOINT)
         return JSONResponse(
             status_code=202,
             content={
