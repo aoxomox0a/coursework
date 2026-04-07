@@ -3,6 +3,7 @@ API routes for SPARQL Generation & Execution — Topic 3.
 """
 
 import logging
+from typing import Optional
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -30,6 +31,7 @@ class AnswerResponse(BaseModel):
     status: str
     question: str
     answer: str
+    sparql_query: Optional[str] = None
     error: str | None = None
 
 
@@ -86,6 +88,7 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
             status="error",
             question=request.question,
             answer="",
+            sparql_query=result.get("sparql_query"),
             error=result.get("error_message"),
         )
 
@@ -93,5 +96,6 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
         status="success",
         question=request.question,
         answer=result["answer"],
+        sparql_query=result.get("sparql_query"),
         error=None,
     )
