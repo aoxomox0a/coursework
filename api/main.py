@@ -6,14 +6,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from api.routes import indexing, sparql, linking
 from contextlib import asynccontextmanager
+import asyncio
+import logging
 
 from src.sparql.llm import http_client
+from config.settings import SPARQL_ENDPOINT
+from src.indexing.chroma_storage import is_endpoint_indexed
+from api.routes.indexing import managed_indexing_task
+
+logger = logging.getLogger(__name__)
 
 
 # safely close the global HTTP connection pool on server shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- STARTUP ---
+    logger.info("Wakiing up the API...")
+    if not is_endpoint_indexed(SPARQL_ENDPOINT):
+        logger.warning(
+            f"Index missing for {SPARQL_ENDPOINT}. Bob the Builder is on it..."
+        )
+        asyncio.create_task(managed_indexing_task(SPARQL_ENDPOINT))
+    else:
+        logger.info("Index verified. System fired up")
+
     yield
     # --- SHUTDOWN ---
     print("Closing LLM connection pool...")
