@@ -5,11 +5,26 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from api.routes import indexing, sparql, linking
+from contextlib import asynccontextmanager
+
+from src.sparql.llm import http_client
+
+
+# safely close the global HTTP connection pool on server shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP ---
+    yield
+    # --- SHUTDOWN ---
+    print("Closing LLM connection pool...")
+    await http_client.aclose()
+
 
 app = FastAPI(
     title="NL-to-SPARQL API",
     description="Convert natural language questions to SPARQL queries",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Enable CORS for frontend

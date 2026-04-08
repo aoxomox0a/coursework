@@ -244,7 +244,9 @@ def query_entities_in_chroma(
     Returns:
         List of similar entities with scores
     """
-    client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    # client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    # use shared client
+    client = _get_client()
 
     # Generate endpoint-specific collection name
     final_collection_name = get_collection_name(collection_name, endpoint)

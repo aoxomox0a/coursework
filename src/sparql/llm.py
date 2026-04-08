@@ -16,6 +16,11 @@ _SPARQL_KEYWORD_RE = re.compile(
     r"\b(PREFIX|SELECT|CONSTRUCT|ASK|DESCRIBE)\b", re.IGNORECASE
 )
 
+# craete global client with connnection pooling enabled
+http_client = httpx.AsyncClient(
+    limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)
+)
+
 
 async def call_llm(prompt: str) -> str:
     """
@@ -38,40 +43,40 @@ async def call_llm(prompt: str) -> str:
         "max_tokens": 512,
     }
 
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                f"{LLM_ENDPOINT}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=60,
-            )
+    try:
+        # use global client
+        response = await http_client.post(
+            f"{LLM_ENDPOINT}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60,
+        )
 
-            if response.status_code == 200:
-                try:
-                    return response.json()["choices"][0]["message"]["content"]
-                except (KeyError, IndexError) as exc:
-                    logger.error(
-                        "Unexpected LLM response shape: %s — body: %.200s",
-                        exc,
-                        response.text,
-                    )
-                    return ""
+        if response.status_code == 200:
+            try:
+                return response.json()["choices"][0]["message"]["content"]
+            except (KeyError, IndexError) as exc:
+                logger.error(
+                    "Unexpected LLM response shape: %s — body: %.200s",
+                    exc,
+                    response.text,
+                )
+                return ""
 
-            logger.error(
-                "LLM returned status %d: %s", response.status_code, response.text[:200]
-            )
-            return ""
+        logger.error(
+            "LLM returned status %d: %s", response.status_code, response.text[:200]
+        )
+        return ""
 
-        except requests.exceptions.Timeout:
-            logger.error("LLM request timed out")
-            return ""
-        except httpx.RequestError as exc:
-            logger.error("LLM HTTP error: %s", exc)
-            return ""
-        except Exception as exc:
-            logger.error("Unexpected error calling LLM: %s", exc)
-            return ""
+    except requests.exceptions.Timeout:
+        logger.error("LLM request timed out")
+        return ""
+    except httpx.RequestError as exc:
+        logger.error("LLM HTTP error: %s", exc)
+        return ""
+    except Exception as exc:
+        logger.error("Unexpected error calling LLM: %s", exc)
+        return ""
 
 
 def extract_sparql_from_response(response_text: str) -> str:
