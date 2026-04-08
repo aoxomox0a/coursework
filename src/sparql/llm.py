@@ -2,12 +2,12 @@
 Call LLM for SPARQL generation via Hactar (OpenAI-compatible /chat/completions endpoint).
 """
 
-import re
 import logging
-import requests
-from config.settings import LLM_ENDPOINT, LLM_API_KEY, LLM_MODEL
+import re
 
 import httpx
+
+from config.settings import LLM_API_KEY, LLM_ENDPOINT, LLM_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ async def call_llm(prompt: str) -> str:
             )
             return ""
 
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             logger.error("LLM request timed out")
             return ""
         except httpx.RequestError as exc:
