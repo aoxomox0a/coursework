@@ -4,7 +4,6 @@ from src.indexing import endpoint, entities, embedding, chroma_storage
 from config.settings import BATCH_SIZE, LIMIT_ENTITIES
 import asyncio
 from typing import Dict
-import math
 
 
 async def run_indexing_pipeline(
@@ -45,7 +44,9 @@ async def run_indexing_pipeline(
     send_status("▸ Testing SPARQL endpoint connection...")
     if not await endpoint.test_connection():
         send_status("✗ Failed to connect to SPARQL endpoint")
-        return False
+        raise ConnectionError(
+            f"Cannot reach SPARQL endpoint at {custom_endpoint or 'default'}"
+        )
 
     # Step 2: Fetch schema (properties and classes)
     send_status("▸ Fetching schema properties...")
