@@ -90,6 +90,7 @@ async def fetch_entities(limit: int = None) -> list:
     WHERE {{
         ?entity rdfs:label ?label ;
                 rdf:type ?type .
+        FILTER (lang(?label) = 'en')
     }}
     {limit_clause}
     """
@@ -130,7 +131,10 @@ async def fetch_properties(limit: int = None) -> list:
     SELECT DISTINCT ?property ?label
     WHERE {{
         ?property a rdf:Property .
-        OPTIONAL {{ ?property rdfs:label ?label . }}
+        OPTIONAL {{
+            ?property rdfs:label ?label .
+            FILTER (lang(?label) = 'en')
+        }}
     }}
     {limit_clause}
     """
@@ -169,7 +173,10 @@ async def fetch_classes(limit: int = None) -> list:
     SELECT DISTINCT ?class ?label
     WHERE {{
         ?class a rdfs:Class .
-        OPTIONAL {{ ?class rdfs:label ?label . }}
+        OPTIONAL {{ 
+            ?class rdfs:label ?label .
+            FILTER (lang(?label) = 'en')
+        }}
     }}
     {limit_clause}
     """
@@ -205,11 +212,19 @@ async def fetch_sample_triples(limit: int = 10000) -> list:
     query = f"""
     SELECT ?subject ?subjectLabel ?predicate ?predicateLabel ?object ?objectLabel
     WHERE {{
-        ?subject ?predicate ?object ;
-                 rdfs:label ?subjectLabel .
+        ?subject ?predicate ?object .
+        FILTER(isURI(?object))
+
+        ?subject rdfs:label ?subjectLabel .
+        FILTER(lang(?subjectLabel) = 'en')
+
         ?object rdfs:label ?objectLabel .
-        OPTIONAL {{ ?predicate rdfs:label ?predicateLabel . }}
-        FILTER(isResource(?object))
+        FILTER(lang(?objectLabel) = 'en')
+
+        OPTIONAL {{
+            ?predicate rdfs:label ?predicateLabel .
+            FILTER(lang(?predicateLabel) = 'en')
+        }}
     }}
     LIMIT {limit}
     """
