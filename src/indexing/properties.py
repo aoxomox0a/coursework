@@ -1,12 +1,15 @@
 """
 Fetch properties and classes from SPARQL endpoint.
 """
+
 from typing import List, Tuple
-import requests
+import httpx
 from config.settings import SPARQL_ENDPOINT
 
 
-def fetch_properties(endpoint_url: str = SPARQL_ENDPOINT) -> List[Tuple[str, str]]:
+async def fetch_properties(
+    endpoint_url: str = SPARQL_ENDPOINT,
+) -> List[Tuple[str, str]]:
     """
     Fetch all properties (predicates) from the knowledge graph.
     Returns list of (URI, label) pairs.
@@ -25,25 +28,24 @@ def fetch_properties(endpoint_url: str = SPARQL_ENDPOINT) -> List[Tuple[str, str
     }
     """
 
-    try:
-        response = requests.get(
-            endpoint_url,
-            params={"query": query, "format": "json"},
-            timeout=30
-        )
-        results = []
-        for binding in response.json().get("results", {}).get("bindings", []):
-            uri = binding.get("property", {}).get("value", "")
-            label = binding.get("label", {}).get("value", uri)
-            if uri:
-                results.append((uri, label))
-        return results
-    except Exception as e:
-        print(f"Error fetching properties: {e}")
-        return []
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        try:
+            response = await client.get(
+                endpoint_url, params={"query": query, "format": "json"}, timeout=30
+            )
+            results = []
+            for binding in response.json().get("results", {}).get("bindings", []):
+                uri = binding.get("property", {}).get("value", "")
+                label = binding.get("label", {}).get("value", uri)
+                if uri:
+                    results.append((uri, label))
+            return results
+        except Exception as e:
+            print(f"Error fetching properties: {e}")
+            return []
 
 
-def fetch_classes(endpoint_url: str = SPARQL_ENDPOINT) -> List[Tuple[str, str]]:
+async def fetch_classes(endpoint_url: str = SPARQL_ENDPOINT) -> List[Tuple[str, str]]:
     """
     Fetch all classes from the knowledge graph.
     Returns list of (URI, label) pairs.
@@ -63,19 +65,18 @@ def fetch_classes(endpoint_url: str = SPARQL_ENDPOINT) -> List[Tuple[str, str]]:
     LIMIT 1000
     """
 
-    try:
-        response = requests.get(
-            endpoint_url,
-            params={"query": query, "format": "json"},
-            timeout=30
-        )
-        results = []
-        for binding in response.json().get("results", {}).get("bindings", []):
-            uri = binding.get("class", {}).get("value", "")
-            label = binding.get("label", {}).get("value", uri)
-            if uri:
-                results.append((uri, label))
-        return results
-    except Exception as e:
-        print(f"Error fetching classes: {e}")
-        return []
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        try:
+            response = await client.get(
+                endpoint_url, params={"query": query, "format": "json"}, timeout=30
+            )
+            results = []
+            for binding in response.json().get("results", {}).get("bindings", []):
+                uri = binding.get("class", {}).get("value", "")
+                label = binding.get("label", {}).get("value", uri)
+                if uri:
+                    results.append((uri, label))
+            return results
+        except Exception as e:
+            print(f"Error fetching classes: {e}")
+            return []
