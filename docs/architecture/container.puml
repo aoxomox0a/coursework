@@ -1,0 +1,38 @@
+@startuml
+!NEW_C4_STYLE=1
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Container Diagram for NL-to-SPARQL system
+
+AddRelTag("async", $lineStyle=DashedLine())
+
+Person(user, "User", "Inputs NL question or SPARQL query")
+
+System_Boundary(c1, "NL-to-SPARQL system") {
+    Container(api, "FastAPI Application", "Python", "Orchestrates data flow, handles routes, and manages application lifespan")
+    Container(indexing, "Indexing Module", "Python", "Fetches schema/triples, generates embeddings, and populates vector store")
+    Container(linking, "Linking Module", "Python", "Extracts NER entities and performs semantic search against vector store")
+    Container(sparql, "SPARQL Module", "Python", "Builds few-shot prompts, queries LLM, and executes final generated SPARQL")
+    ContainerDb(chromadb, "ChromaDB", "Vector Database", "Stores embedded schema properties, classes, and triples")
+}
+
+System_Ext(dbpedia, "DBPedia", "External SPARQL endpoint containing knowledge graph")
+System_Ext(llm, "Hactar LLM", "External syntax generation engine")
+
+Rel(user, api, "Submits natural language question", "JSON/HTTPS")
+
+Rel(api, indexing, "Triggers background indexing", "AsyncIO", $tags="async")
+Rel(api, linking, "Requests entity linking for user query")
+Rel(api, sparql, "Passes linked context and user query")
+
+Rel(indexing, chromadb, "Stores vector embeddings", "Disk I/O", $tags="async")
+Rel(linking, chromadb, "Queries via cosine similarity", "Disk I/O")
+
+Rel(indexing, dbpedia, "Batches schema & triple downloads", "HTTPS/httpx", $tags="async")
+Rel(sparql, llm, "Sends prompt and receives SPARQL syntax", "HTTPS/httpx", $tags="async")
+Rel(sparql, dbpedia, "Executes generated SPARQL query", "HTTPS/httpx", $tags="async")
+
+Rel(api, user, "Returns final JSON answers", "JSON/HTTPS")
+
+SHOW_LEGEND()
+@enduml
