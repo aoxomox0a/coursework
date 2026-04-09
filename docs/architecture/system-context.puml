@@ -1,4 +1,5 @@
 @startuml
+skinparam dpi 300
 !NEW_C4_STYLE=1
 
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
@@ -7,7 +8,7 @@ title System Context Diagram for NL-to-SPARQL system
 
 Person(user, "User", "Inputs NL question or SPARQL query")
 
-System(api, "API Application", "Processes NL question or SPARQL query to output corresponding SPARQL query or NL question respectively")
+System(api, "API Application", "Processes NL question or SPARQL query")
 
 System_Ext(dbpedia, "DBPedia", "External sparql endpoint containing triples")
 System_Ext(llm, "LLM", "Hactar used as a syntax generation engine")
