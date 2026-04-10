@@ -51,27 +51,19 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
         AnswerResponse with status, question, answer, and optional error
     """
     if not is_endpoint_indexed(SPARQL_ENDPOINT):
-        if is_indexing_in_progress():
-            return JSONResponse(
-                status_code=202,
-                content={
-                    "status": "indexing",
-                    "message": "Endpoint indexing is in progress. Please retry in a few minutes.",
-                },
-            )
-        logger.info(
-            "Endpoint %s not indexed — triggering auto-indexing", SPARQL_ENDPOINT
+        status_msg = (
+            "Endpoint indexing is currently in progress."
+            if is_indexing_in_progress()
+            else "Endpoint index is missing or failed to initialize on startup."
         )
-        # replace legacy call with managed background task
-        background_tasks.add_task(managed_indexing_task, SPARQL_ENDPOINT)
+        logger.warning(
+            f"Query rejected: Index unavailable for {SPARQL_ENDPOINT}. State: {status_msg}"
+        )
         return JSONResponse(
-            status_code=202,
+            status_code=202 if is_indexing_in_progress else 503,
             content={
-                "status": "indexing",
-                "message": (
-                    "Endpoint not indexed yet. Indexing started automatically. "
-                    "Please retry in a few minutes."
-                ),
+                "status": "indexing" if is_indexing_in_progress() else "error",
+                "message": f"{status_msg} Please try again later.",
             },
         )
 
