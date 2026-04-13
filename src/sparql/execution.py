@@ -13,33 +13,38 @@ logger = logging.getLogger(__name__)
 
 _ACCEPT_JSON = "application/sparql-results+json"
 
+# global clinet
+sparql_client = httpx.AsyncClient(
+    follow_redirects=True,
+    limits=httpx.Limits(max_connections=50, max_keepalive_connections=10),
+)
+
 
 async def execute_query(
     query: str,
     endpoint_url: str = SPARQL_ENDPOINT,
 ) -> dict[str, Any]:
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        try:
-            response = await client.get(
-                endpoint_url,
-                params={"query": query, "format": "json"},
-                headers={"Accept": _ACCEPT_JSON},
-                timeout=60,
-            )
+    try:
+        response = await sparql_client.get(
+            endpoint_url,
+            params={"query": query, "format": "json"},
+            headers={"Accept": _ACCEPT_JSON},
+            timeout=60,
+        )
 
-            if response.status_code == 200:
-                return response.json()
+        if response.status_code == 200:
+            return response.json()
 
-            logger.error(
-                "SPARQL endpoint returned %d for query: %.100s",
-                response.status_code,
-                query,
-            )
-            return {"error": f"Endpoint returned {response.status_code}"}
-        except Exception as exc:
-            logger.error("Error executing SPARQL query: %s", exc)
-            return {"error": str(exc)}
+        logger.error(
+            "SPARQL endpoint returned %d for query: %.100s",
+            response.status_code,
+            query,
+        )
+        return {"error": f"Endpoint returned {response.status_code}"}
+    except Exception as exc:
+        logger.error("Error executing SPARQL query: %s", exc)
+        return {"error": str(exc)}
 
 
 def format_results(results_json: dict[str, Any]) -> str:

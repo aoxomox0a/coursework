@@ -10,6 +10,7 @@ import asyncio
 import logging
 
 from src.sparql.llm import http_client
+from src.sparql.execution import sparql_client
 from config.settings import SPARQL_ENDPOINT
 from src.indexing.chroma_storage import is_endpoint_indexed
 from api.routes.indexing import managed_indexing_task
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
     # --- SHUTDOWN ---
     print("Closing LLM connection pool...")
     await http_client.aclose()
+    await sparql_client.aclose()
 
 
 app = FastAPI(
