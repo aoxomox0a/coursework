@@ -3,7 +3,6 @@ Execute SPARQL queries on endpoint and format results.
 """
 
 import logging
-import requests
 from typing import Any
 from config.settings import SPARQL_ENDPOINT
 
