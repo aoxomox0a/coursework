@@ -80,30 +80,20 @@ async def call_llm(prompt: str) -> str:
 
 
 def extract_sparql_from_response(response_text: str) -> str:
-    """
-    Extract a SPARQL query from LLM response text.
-
-    Tries two strategies in order:
-    1. Regex extraction from ```sparql ... ``` or ``` ... ``` fences.
-    2. Fallback: keyword scan from first PREFIX/SELECT/CONSTRUCT/ASK/DESCRIBE line.
-
-    Args:
-        response_text: Raw text returned by the LLM
-
-    Returns:
-        Extracted SPARQL query string, or empty string if none found
-    """
+    # Extract a SPARQL query from LLM response text.
+    # returns extracted SPARQL query string, or empty string if none found
     if not response_text:
         return ""
 
-    # Strategy 1: fenced code block
+    # regex extraction from fenced code blocl
     match = _SPARQL_FENCE_RE.search(response_text)
     if match:
-        return match.group(1).strip()
+        return match.group(1).replace("```", "").strip()
 
-    # Strategy 2: keyword scan fallback
+    # keyword scan fallback
     kw_match = _SPARQL_KEYWORD_RE.search(response_text)
     if kw_match:
-        return response_text[kw_match.start() :].strip()
+        extracted = response_text[kw_match.start() :].strip()
+        return extracted.replace("```", "").strip()
 
     return ""
