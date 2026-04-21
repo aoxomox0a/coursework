@@ -82,6 +82,26 @@ Broken query:
 ```sparql
 """
 
+SPARQL_EXPLANATION_TEMPLATE = """\
+You are a SPARQL query explainer. Your task is to translate a SPARQL query into clear, concise natural language.
+
+## Rules
+- Explain what data the query retrieves
+- Describe the relationships and filters in simple terms
+- Keep the explanation short (1-2 sentences)
+- Be specific about entities, properties, and constraints
+- Do NOT output code or technical syntax — only natural language
+
+## SPARQL Query to explain
+
+```sparql
+{sparql_query}
+```
+
+## Natural language explanation
+
+"""
+
 
 def generate_sparql_prompt(
     question: str,
@@ -144,3 +164,16 @@ def generate_fix_sparql_prompt(
         original_query=original_query,
         error_message=error_message,
     )
+
+
+def generate_sparql_explanation_prompt(sparql_query: str) -> str:
+    """
+    Generate an LLM prompt to explain a SPARQL query in natural language.
+
+    Args:
+        sparql_query: The SPARQL query to explain
+
+    Returns:
+        Formatted explanation prompt string
+    """
+    return SPARQL_EXPLANATION_TEMPLATE.format(sparql_query=sparql_query)
