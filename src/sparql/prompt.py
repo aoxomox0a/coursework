@@ -83,23 +83,19 @@ Broken query:
 """
 
 SPARQL_EXPLANATION_TEMPLATE = """\
-You are a SPARQL query explainer. Your task is to translate a SPARQL query into clear, concise natural language.
+You are an expert at converting SPARQL queries back to natural language questions.
 
-## Rules
-- Explain what data the query retrieves
-- Describe the relationships and filters in simple terms
-- Keep the explanation short (1-2 sentences)
-- Be specific about entities, properties, and constraints
-- Do NOT output code or technical syntax — only natural language
+Analyze this SPARQL query and output ONLY the natural language question that would generate it.
 
-## SPARQL Query to explain
+The output should be a single, clear question ending with a question mark.
+No code. No explanation. Just the question.
 
-```sparql
+SPARQL Query:
+```
 {sparql_query}
 ```
 
-## Natural language explanation
-
+Natural Language Question:
 """
 
 

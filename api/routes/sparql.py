@@ -46,7 +46,7 @@ class ExplainRequest(BaseModel):
 class ExplainResponse(BaseModel):
     status: str
     sparql_query: str
-    explanation: str
+    question: str
     error: str | None = None
 
 
@@ -111,38 +111,38 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
 @router.post("/explain")
 async def explain_sparql(request: ExplainRequest):
     """
-    Explain a SPARQL query in natural language.
+    Recover the original natural language question from a SPARQL query.
 
     Args:
         request: ExplainRequest with 'sparql_query' field
 
     Returns:
-        ExplainResponse with status, sparql_query, and natural language explanation
+        ExplainResponse with status, sparql_query, and original question
     """
     try:
         prompt = generate_sparql_explanation_prompt(request.sparql_query)
-        explanation = await call_llm(prompt)
+        question = await call_llm(prompt)
 
-        if not explanation:
+        if not question:
             return ExplainResponse(
                 status="error",
                 sparql_query=request.sparql_query,
-                explanation="",
-                error="LLM failed to generate explanation",
+                question="",
+                error="LLM failed to generate question",
             )
 
         return ExplainResponse(
             status="success",
             sparql_query=request.sparql_query,
-            explanation=explanation.strip(),
+            question=question.strip(),
             error=None,
         )
 
     except Exception as exc:
-        logger.error("Explanation error for query '%s': %s", request.sparql_query, exc)
+        logger.error("Question generation error for query '%s': %s", request.sparql_query, exc)
         return ExplainResponse(
             status="error",
             sparql_query=request.sparql_query,
-            explanation="",
+            question="",
             error=str(exc),
         )

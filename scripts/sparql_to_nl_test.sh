@@ -19,7 +19,7 @@ if ! curl -s -f -o /dev/null "http://localhost:8000/health"; then
     exit 1
 fi
 
-echo -e "\033[1;32mServer is up. Beginning SPARQL explanation tests...\033[0m\n"
+echo -e "\033[1;32mServer is up. Beginning SPARQL to NL recovery tests...\033[0m\n"
 
 # Array of SPARQL queries to test
 QUERIES=(
@@ -54,9 +54,9 @@ for query in "${QUERIES[@]}"; do
       echo -e "\033[1;31mRequest failed with HTTP $HTTP_STATUS\033[0m"
       jq . "$RESPONSE_BODY" 2>/dev/null || cat "$RESPONSE_BODY"
   else
-      # Extract and pretty print the explanation
-      echo -e "\033[1;32mExplanation:\033[0m"
-      jq -r '.explanation' "$RESPONSE_BODY" 2>/dev/null || cat "$RESPONSE_BODY"
+      # Extract and pretty print the natural language question
+      echo -e "\033[1;32mNatural Language Query:\033[0m"
+      jq -r '.question' "$RESPONSE_BODY" 2>/dev/null || cat "$RESPONSE_BODY"
       echo ""
   fi
   
@@ -65,4 +65,4 @@ for query in "${QUERIES[@]}"; do
   sleep 1 
 done
 
-echo -e "\033[1;32mAll SPARQL explanation tests completed.\033[0m"
+echo -e "\033[1;32mAll SPARQL to NL recovery tests completed.\033[0m"
