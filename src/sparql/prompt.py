@@ -82,6 +82,22 @@ Broken query:
 ```sparql
 """
 
+SPARQL_EXPLANATION_TEMPLATE = """\
+You are an expert at converting SPARQL queries back to natural language questions.
+
+Analyze this SPARQL query and output ONLY the natural language question that would generate it.
+
+The output should be a single, clear question ending with a question mark.
+No code. No explanation. Just the question.
+
+SPARQL Query:
+```
+{sparql_query}
+```
+
+Natural Language Question:
+"""
+
 
 def generate_sparql_prompt(
     question: str,
@@ -144,3 +160,16 @@ def generate_fix_sparql_prompt(
         original_query=original_query,
         error_message=error_message,
     )
+
+
+def generate_sparql_explanation_prompt(sparql_query: str) -> str:
+    """
+    Generate an LLM prompt to explain a SPARQL query in natural language.
+
+    Args:
+        sparql_query: The SPARQL query to explain
+
+    Returns:
+        Formatted explanation prompt string
+    """
+    return SPARQL_EXPLANATION_TEMPLATE.format(sparql_query=sparql_query)

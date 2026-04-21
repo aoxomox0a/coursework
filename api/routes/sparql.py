@@ -15,6 +15,8 @@ from src.indexing.chroma_storage import is_endpoint_indexed
 from src.indexing.indexing_state import (
     is_indexing_in_progress,
 )
+from src.sparql.llm import call_llm
+from src.sparql.prompt import generate_sparql_explanation_prompt
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,19 @@ class AnswerResponse(BaseModel):
     question: str
     answer: str
     sparql_query: Optional[str] = None
+    error: str | None = None
+
+
+class ExplainRequest(BaseModel):
+    sparql_query: str = Field(
+        ..., min_length=1, description="SPARQL query to explain"
+    )
+
+
+class ExplainResponse(BaseModel):
+    status: str
+    sparql_query: str
+    question: str
     error: str | None = None
 
 
@@ -91,3 +106,43 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
         sparql_query=result.get("sparql_query"),
         error=None,
     )
+
+
+@router.post("/explain")
+async def explain_sparql(request: ExplainRequest):
+    """
+    Recover the original natural language question from a SPARQL query.
+
+    Args:
+        request: ExplainRequest with 'sparql_query' field
+
+    Returns:
+        ExplainResponse with status, sparql_query, and original question
+    """
+    try:
+        prompt = generate_sparql_explanation_prompt(request.sparql_query)
+        question = await call_llm(prompt)
+
+        if not question:
+            return ExplainResponse(
+                status="error",
+                sparql_query=request.sparql_query,
+                question="",
+                error="LLM failed to generate question",
+            )
+
+        return ExplainResponse(
+            status="success",
+            sparql_query=request.sparql_query,
+            question=question.strip(),
+            error=None,
+        )
+
+    except Exception as exc:
+        logger.error("Question generation error for query '%s': %s", request.sparql_query, exc)
+        return ExplainResponse(
+            status="error",
+            sparql_query=request.sparql_query,
+            question="",
+            error=str(exc),
+        )
