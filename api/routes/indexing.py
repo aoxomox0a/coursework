@@ -20,6 +20,7 @@ class IndexRequest(BaseModel):
     """Request model for indexing."""
 
     endpoint: str = None
+    max_entities: int = None
 
 
 class ProgressRequest(BaseModel):
@@ -29,13 +30,13 @@ class ProgressRequest(BaseModel):
 
 
 # create async wrapper to manage the UI state while the background task runs
-async def managed_indexing_task(endpoint: str):
+async def managed_indexing_task(endpoint: str, max_entities: int = None):
     toggle_indexing_state(True)
     update_status("Starting indexing...", endpoint)
     try:
         # We must await the async pipeline now!
         await run_indexing_pipeline(
-            custom_endpoint=endpoint, status_callback=update_status
+            custom_endpoint=endpoint, status_callback=update_status, max_entities=max_entities
         )
         update_status("✓ Indexing completed successfully!", endpoint)
     except Exception as exc:
@@ -67,7 +68,7 @@ def trigger_indexing(request: IndexRequest, background_tasks: BackgroundTasks):
     if is_indexing_in_progress():
         return {"status": "processing", "message": "Indexing already in progress"}
 
-    background_tasks.add_task(managed_indexing_task, request.endpoint)
+    background_tasks.add_task(managed_indexing_task, request.endpoint, request.max_entities)
     return {"status": "processing", "message": "Indexing started in background"}
 
 
