@@ -55,3 +55,6 @@ coverage.xml
 # 7. Ruff
 # =========================
 .ruff_cache/
+
+# Local project walkthrough notes
+DEVELOPMENT_GUIDE.md

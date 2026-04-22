@@ -4,9 +4,9 @@ Get the NL-to-SPARQL indexing system up and running in minutes.
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.10+
 - Node.js 16+ (for the web UI)
-- pip and npm
+- uv (Python package manager)
 
 ## Setup
 
@@ -14,7 +14,7 @@ Get the NL-to-SPARQL indexing system up and running in minutes.
 
 ```bash
 # Install Python dependencies
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 2. Frontend Setup
@@ -31,12 +31,14 @@ cd ..
 ### Option A: Web UI (Recommended)
 
 **Terminal 1 - Start Backend API:**
+
 ```bash
-python main.py api
+uv run python main.py api
 # API running at http://localhost:8000
 ```
 
 **Terminal 2 - Start Frontend:**
+
 ```bash
 cd ui
 npm run dev
@@ -49,10 +51,48 @@ Open `http://localhost:3000` in your browser, select an endpoint, and click "Ind
 
 ```bash
 # Index with default endpoint (DBpedia)
-python main.py index
+uv run python main.py index
 
 # Index with custom endpoint via CLI (coming soon)
 ```
+
+## Testing the System
+
+### Unit Tests
+
+Run the test suite to verify core functionality:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov=src --cov-report=html
+
+# Run specific test file
+uv run pytest tests/sparql/test_pipeline.py
+```
+
+### Integration Tests
+
+Test the full system end-to-end:
+
+```bash
+# Start the API server in background
+uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 &
+
+# Run the prompt test script
+./scripts/prompt_test.sh
+
+# Stop the background server
+kill %1
+```
+
+### Manual Testing
+
+1. **Index some entities** using the web UI or CLI
+2. **Query the system** via API or web interface
+3. **Verify results** in the ChromaDB storage
 
 ## Configuration
 
@@ -90,25 +130,30 @@ LIMIT_ENTITIES=10000
 ## Troubleshooting
 
 **"Connection failed" error?**
+
 - Verify the SPARQL endpoint URL is correct
 - Check your internet connection
 - Try DBpedia directly: `http://dbpedia.org/sparql`
 
 **Port 3000/8000 already in use?**
+
 - Change port for UI: `cd ui && npm run dev -- -p 3001`
 - Change port for API: Update `API_PORT` in `.env`
 
 **Slow indexing?**
+
 - Reduce `BATCH_SIZE` in `.env` if out of memory
 - Reduce `LIMIT_ENTITIES` for faster testing
 
 **CORS errors in browser?**
-- Ensure backend API is running (`python main.py api`)
+
+- Ensure backend API is running (`uv run python main.py api`)
 - Backend CORS is configured in `api/main.py`
 
 ## Next Steps
 
 Once entities are indexed:
+
 - Phase 2: Implement entity and relation linking
 - Phase 3: Implement SPARQL generation and execution
 

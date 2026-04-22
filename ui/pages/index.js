@@ -8,7 +8,7 @@ export default function Home() {
         <title>NL-to-SPARQL - Entity Indexing</title>
         <meta name="description" content="Index entities into vector embeddings" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/x-icon" href="favicon.ico" />
       </Head>
 
       <main>
