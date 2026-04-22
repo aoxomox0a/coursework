@@ -9,6 +9,58 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  position: relative;
+}
+
+/* ===== MUSIC PLAYER BUTTON ===== */
+.musicButton {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: white;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+.musicButton:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.musicButton.playing {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: white;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.musicButton.playing:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.6);
+}
+
+@keyframes musicPulse {
+  0%, 100% {
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  }
+  50% {
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.8);
+  }
+}
+
+.musicButton.playing {
+  animation: musicPulse 2s ease-in-out infinite;
 }
 
 .mainWrapper {
@@ -616,6 +668,14 @@
 @media (max-width: 600px) {
   .container {
     padding: 20px 16px;
+  }
+
+  .musicButton {
+    top: 16px;
+    right: 16px;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
   }
 
   .card {

@@ -13,6 +13,24 @@ const PREDEFINED_QUERIES = [
   }
 ];
 
+// Multiple ambient music URLs (free ambient/elevator music)
+const AMBIENT_MUSIC_URLS = [
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+];
+
+const getRandomMusicUrl = () => {
+  return AMBIENT_MUSIC_URLS[Math.floor(Math.random() * AMBIENT_MUSIC_URLS.length)];
+};
+
 export default function QueryTranslator() {
   const [endpoint, setEndpoint] = useState('http://dbpedia.org/sparql');
   const [isIndexing, setIsIndexing] = useState(false);
@@ -31,7 +49,20 @@ export default function QueryTranslator() {
   const [isExplaining, setIsExplaining] = useState(false);
   const [explanationError, setExplanationError] = useState('');
   
+  const [isPlayingMusic, setIsPlayingMusic] = useState(false);
+  
   const dropdownRef = useRef(null);
+  const audioRef = useRef(null);
+
+  // Initialize audio element
+  useEffect(() => {
+    if (!audioRef.current) {
+      const audio = new Audio(getRandomMusicUrl());
+      audio.loop = true;
+      audio.volume = 0.3; // Set volume to 30%
+      audioRef.current = audio;
+    }
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -44,6 +75,39 @@ export default function QueryTranslator() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Handle music toggle
+  const handleMusicToggle = async () => {
+    if (!audioRef.current) return;
+
+    try {
+      if (isPlayingMusic) {
+        audioRef.current.pause();
+        setIsPlayingMusic(false);
+        console.log('🔊 Music paused');
+      } else {
+        // Load a random track before playing
+        audioRef.current.src = getRandomMusicUrl();
+        audioRef.current.currentTime = 0;
+        await audioRef.current.play();
+        setIsPlayingMusic(true);
+        console.log('🔊 Music playing (random track selected)');
+      }
+    } catch (error) {
+      console.error('🔊 Error toggling music:', error);
+      // Silently fail - may be due to browser autoplay policies
+    }
+  };
+
+  // Cleanup: stop music when component unmounts
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
 
   // Check if endpoint is indexed
   const checkIndexStatus = async (url) => {
@@ -224,6 +288,16 @@ export default function QueryTranslator() {
 
   return (
     <div className={styles.container}>
+      {/* Music Player Button */}
+      <button
+        onClick={handleMusicToggle}
+        className={`${styles.musicButton} ${isPlayingMusic ? styles.playing : ''}`}
+        title={isPlayingMusic ? 'Stop music' : 'Play ambient music'}
+        aria-label="Toggle ambient music"
+      >
+        {isPlayingMusic ? '🎵' : '🎵'}
+      </button>
+
       <h1 className={styles.title}>Natural Language ⇌ SPARQL</h1>
       
       <div className={styles.mainWrapper}>
