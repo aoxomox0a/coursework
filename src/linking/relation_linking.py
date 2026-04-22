@@ -2,8 +2,9 @@
 Link relations in questions to properties in knowledge graph.
 """
 from typing import List, Dict
-from config.settings import SPARQL_ENDPOINT
+
 from src.indexing.chroma_storage import query_candidates
+from src.indexing.endpoint import get_endpoint
 
 
 def find_relation_candidates(
@@ -12,6 +13,9 @@ def find_relation_candidates(
 ) -> List[Dict[str, any]]:
     """
     Embed the question and find closest properties in ChromaDB.
+
+    The endpoint is resolved via get_endpoint() at call time so runtime
+    endpoint switches are respected.
 
     Args:
         question: Natural language question
@@ -23,7 +27,7 @@ def find_relation_candidates(
     return query_candidates(
         query_text=question,
         collection_name="properties",
-        endpoint=SPARQL_ENDPOINT,
+        endpoint=get_endpoint(),
         top_k=top_k,
     )
 

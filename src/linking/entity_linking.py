@@ -2,8 +2,9 @@
 Link extracted entities to URIs in knowledge graph using ChromaDB.
 """
 from typing import List, Dict
-from config.settings import SPARQL_ENDPOINT
+
 from src.indexing.chroma_storage import query_candidates
+from src.indexing.endpoint import get_endpoint
 
 
 def link_entities(
@@ -13,19 +14,24 @@ def link_entities(
     """
     Match extracted entity texts to URIs in ChromaDB.
 
+    The SPARQL endpoint (and therefore the backing ChromaDB collection) is
+    resolved via get_endpoint() at call time, so runtime endpoint switches
+    are respected.
+
     Args:
-        extracted_entities: List of entity texts from NER
-        top_k: Number of candidates to return per entity
+        extracted_entities: List of entity texts from NER / noun extraction.
+        top_k: Number of candidates to return per entity.
 
     Returns:
-        List of dicts with entity, candidates, and scores
+        List of {entity, candidates} dicts.
     """
+    endpoint = get_endpoint()
     results = []
     for entity in extracted_entities:
         candidates = query_candidates(
             query_text=entity,
             collection_name="entities",
-            endpoint=SPARQL_ENDPOINT,
+            endpoint=endpoint,
             top_k=top_k,
         )
         results.append({"entity": entity, "candidates": candidates})
