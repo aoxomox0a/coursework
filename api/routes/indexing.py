@@ -2,7 +2,10 @@
 API routes for Graph Indexing
 """
 
+import asyncio
+import json
 from fastapi import APIRouter, status, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src.indexing import entities, chroma_storage
 from src.indexing.pipeline import run_indexing_pipeline
@@ -11,6 +14,9 @@ from src.indexing.indexing_state import (
     is_indexing_in_progress,
     update_status,
     toggle_indexing_state,
+    register_sse_client,
+    unregister_sse_client,
+    broadcast_status_update,
 )
 
 router = APIRouter()
@@ -23,26 +29,25 @@ class IndexRequest(BaseModel):
     max_entities: int = None
 
 
-class ProgressRequest(BaseModel):
-    """Request model for progress info."""
-
-    endpoint: str
-
-
 # create async wrapper to manage the UI state while the background task runs
 async def managed_indexing_task(endpoint: str, max_entities: int = None):
+    print(f"\n🚀 [managed_indexing_task] Starting for endpoint: {endpoint}")
     toggle_indexing_state(True)
     update_status("Starting indexing...", endpoint)
     try:
         # We must await the async pipeline now!
+        print(f"📋 [managed_indexing_task] Running indexing pipeline...")
         await run_indexing_pipeline(
             custom_endpoint=endpoint, status_callback=update_status, max_entities=max_entities
         )
+        print(f"✓ [managed_indexing_task] Indexing pipeline completed")
         update_status("✓ Indexing completed successfully!", endpoint)
     except Exception as exc:
+        print(f"❌ [managed_indexing_task] Error: {exc}")
         update_status("✗ Indexing failed", endpoint, str(exc))
     finally:
         # Crucial: Ensure the UI knows we finished, even if it crashed
+        print(f"🛑 [managed_indexing_task] Marking indexing as complete")
         toggle_indexing_state(False)
 
 
@@ -50,7 +55,7 @@ async def managed_indexing_task(endpoint: str, max_entities: int = None):
 def trigger_indexing(request: IndexRequest, background_tasks: BackgroundTasks):
     """
     Trigger the full indexing pipeline.
-    Skips silently if the endpoint has already been indexed.
+    If endpoint is already indexed, deletes old data and re-indexes.
     Connects to endpoint, fetches properties/classes/entities, embeds, and stores in ChromaDB.
 
     Args:
@@ -59,15 +64,17 @@ def trigger_indexing(request: IndexRequest, background_tasks: BackgroundTasks):
     Returns:
         Status confirmation
     """
+    print(f"\n🔍 [/api/index] Endpoint: {request.endpoint}")
+    
     if chroma_storage.is_endpoint_indexed(request.endpoint):
-        return {
-            "status": "already_indexed",
-            "message": "Endpoint already indexed — skipping",
-        }
+        print(f"♻️  [/api/index] Endpoint already indexed - deleting old data and re-indexing...")
+        chroma_storage.delete_endpoint_index(request.endpoint)
 
     if is_indexing_in_progress():
+        print(f"⚠️  [/api/index] Indexing already in progress - skipping")
         return {"status": "processing", "message": "Indexing already in progress"}
 
+    print(f"✓ [/api/index] Starting background indexing task...")
     background_tasks.add_task(managed_indexing_task, request.endpoint, request.max_entities)
     return {"status": "processing", "message": "Indexing started in background"}
 
@@ -83,82 +90,67 @@ def get_indexing_status():
     return get_status()
 
 
-@router.post("/counts")
-def get_collection_counts(request: ProgressRequest):
+@router.post("/check")
+def check_indexed(request: IndexRequest):
     """
-    Get current counts from all ChromaDB collections for a specific endpoint.
-
+    Check if a specific endpoint is indexed.
+    
     Args:
-        request: ProgressRequest with 'endpoint' field
-
+        request: IndexRequest with 'endpoint' field
+    
     Returns:
-        Current indexed counts
+        Status and indexing info
     """
-    try:
-        chroma_counts = chroma_storage.get_all_collection_counts(
-            endpoint=request.endpoint
-        )
-        return {
-            "status": "success",
-            "counts": {
-                "entities": chroma_counts.get("entities", 0),
-                "properties": chroma_counts.get("properties", 0),
-                "classes": chroma_counts.get("classes", 0),
-                "sample_triples": chroma_counts.get("sample_triples", 0),
-                "class_entity_mappings": chroma_counts.get("class_entity_mappings", 0),
-            },
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "counts": {
-                "entities": 0,
-                "properties": 0,
-                "classes": 0,
-                "sample_triples": 0,
-                "class_entity_mappings": 0,
-            },
-        }
+    is_indexed = chroma_storage.is_endpoint_indexed(request.endpoint)
+    return {
+        "status": "success",
+        "endpoint": request.endpoint,
+        "is_indexed": is_indexed,
+        "message": "Indexed" if is_indexed else "Not indexed"
+    }
 
 
-@router.post("/progress")
-def get_progress(request: ProgressRequest):
+@router.get("/status/stream")
+async def stream_indexing_status(endpoint: str):
     """
-    Get indexing progress: total entities and currently indexed count.
-
+    Stream indexing status updates via Server-Sent Events (SSE).
+    
     Args:
-        request: ProgressRequest with 'endpoint' field
-
-    Returns:
-        Total entities, indexed count, and progress percentage
+        endpoint: SPARQL endpoint URL to track (query parameter)
+    
+    Yields:
+        JSON status updates when status changes
     """
-    try:
-        # Get total count from SPARQL endpoint
-        total_count = entities.get_total_entity_count(request.endpoint)
-        print(f"/progress {total_count} entities found at endpoint {request.endpoint}")
-
-        # Get current count from ChromaDB
+    # Create queue in async context
+    q = asyncio.Queue()
+    register_sse_client(endpoint, q)
+    
+    async def event_generator():
         try:
-            indexed_count = chroma_storage.get_indexed_count()
-        except:
-            indexed_count = 0
-
-        progress = 0
-        if total_count > 0:
-            progress = int((indexed_count / total_count) * 100)
-
-        return {
-            "status": "success",
-            "total": total_count,
-            "indexed": indexed_count,
-            "progress": progress,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "total": 0,
-            "indexed": 0,
-            "progress": 0,
-        }
+            # Send initial status
+            yield f"data: {json.dumps(get_status())}\n\n"
+            
+            last_is_indexing = True
+            while True:
+                try:
+                    # Wait for status update with timeout
+                    status_update = await asyncio.wait_for(q.get(), timeout=5.0)
+                    yield f"data: {json.dumps(status_update)}\n\n"
+                    
+                    # If indexing just finished (transitioned from True to False), close connection
+                    if last_is_indexing and not status_update.get("is_indexing"):
+                        print(f"📡 [SSE] Indexing completed, closing stream for {endpoint}")
+                        break
+                    
+                    last_is_indexing = status_update.get("is_indexing", False)
+                except asyncio.TimeoutError:
+                    # Timeout - keep connection alive but check if still needed
+                    if not is_indexing_in_progress():
+                        print(f"📡 [SSE] Timeout and no indexing in progress, closing stream")
+                        break
+                    continue
+        finally:
+            unregister_sse_client(endpoint, q)
+            print(f"📡 [SSE] Stream closed for {endpoint}")
+    
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

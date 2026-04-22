@@ -3,64 +3,100 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 40px 20px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
 }
 
-.card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding: 40px;
-  max-width: 1200px;
+.mainWrapper {
+  max-width: 1000px;
   width: 100%;
 }
 
 .title {
-  margin: 0 0 40px 0;
-  color: #333;
-  font-size: 32px;
-  font-weight: 700;
   text-align: center;
+  color: white;
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 40px;
+  margin-top: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.section {
-  margin-bottom: 40px;
-  padding-bottom: 40px;
+/* ===== STEP CARDS ===== */
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 32px;
+  margin-bottom: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.card:last-child {
+  margin-bottom: 0;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
   border-bottom: 2px solid #f0f0f0;
 }
 
-.section:last-child {
-  border-bottom: none;
+.cardStep {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 18px;
+  margin-right: 16px;
+  flex-shrink: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.section {
   margin-bottom: 0;
   padding-bottom: 0;
+  border-bottom: none;
 }
 
 .sectionTitle {
-  margin: 0 0 20px 0;
-  color: #555;
-  font-size: 18px;
-  font-weight: 600;
+  display: none;
 }
 
 .label {
   display: block;
-  margin-bottom: 10px;
   color: #666;
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 6px;
 }
 
 .labelsRow {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 10px;
-  align-items: flex-start;
+  display: none;
 }
 
 .labelsRow .label {
@@ -80,16 +116,33 @@
   margin-bottom: 16px;
 }
 
+/* ===== ENDPOINT ROW LAYOUT ===== */
+.endpointLineContainer {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.endpointLineContainer .comboboxContainer {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 .dropdown {
-  width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  background-color: white;
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
 }
 
 .dropdown:hover {
@@ -115,8 +168,8 @@
 
 .endpointLineContainer {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: center;
   margin-bottom: 16px;
 }
 
@@ -124,29 +177,42 @@
   flex: 1;
 }
 
+.endpointLineContainer .entityLimitContainer {
+  display: none;
+}
+
 .comboboxInput {
   width: 100%;
-  padding: 12px 40px 12px 16px;
+  padding: 12px 14px;
   border: 2px solid #ddd;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
-  transition: border-color 0.2s ease;
+  background-color: white;
+  transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+.comboboxInput:hover {
+  border-color: #667eea;
 }
 
 .comboboxInput:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .comboboxInput:disabled {
   background: #f5f5f5;
   cursor: not-allowed;
+  color: #999;
+  border-color: #ddd;
 }
 
 .entityLimitContainer {
   display: flex;
-  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .entityLimitContainer .label {
@@ -154,46 +220,35 @@
 }
 
 .entityLimitInput {
-  width: 150px;
-  padding: 12px 12px;
+  width: 100%;
+  padding: 12px 14px;
   border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 13px;
-  transition: border-color 0.2s ease;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: white;
+  transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+.entityLimitInput:hover {
+  border-color: #667eea;
 }
 
 .entityLimitInput:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .entityLimitInput:disabled {
   background: #f5f5f5;
   cursor: not-allowed;
+  color: #999;
+  border-color: #ddd;
 }
 
 .dropdownToggle {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: #666;
-  padding: 6px;
-  transition: color 0.2s ease;
-}
-
-.dropdownToggle:hover:not(:disabled) {
-  color: #667eea;
-}
-
-.dropdownToggle:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+  display: none;
 }
 
 .dropdownList {
@@ -202,17 +257,17 @@
   left: 0;
   right: 0;
   background: white;
-  border: 2px solid #ddd;
-  border-top: none;
-  border-radius: 0 0 6px 6px;
+  border: 2px solid #667eea;
+  border-radius: 8px;
   max-height: 200px;
   overflow-y: auto;
   z-index: 10;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  margin-top: 4px;
 }
 
 .dropdownItem {
-  padding: 12px 16px;
+  padding: 12px 14px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   font-size: 14px;
@@ -233,7 +288,7 @@
   width: 100%;
   padding: 12px 16px;
   border: 2px solid #ddd;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
   transition: border-color 0.2s ease;
   box-sizing: border-box;
@@ -251,25 +306,45 @@
 }
 
 .indexLineContainer {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 16px;
+  align-items: flex-end;
   margin-top: 16px;
-  flex-wrap: wrap;
+}
+
+.indexLineContainer .indexBtn {
+  grid-column: 1;
+  flex: 1;
+  height: 44px;
+}
+
+.indexLineContainer .entityLimitContainer {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.indexLineContainer .entityLimitInput {
+  height: 44px;
 }
 
 .button {
   padding: 12px 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .endpointLineContainer .button {
@@ -278,22 +353,49 @@
 }
 
 .indexBtn {
-  background: #63398a;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  flex: 0 0 auto;
-  align-self: center;
+  flex: 1;
+  position: relative;
+  padding: 12px 24px;
 }
 
 .indexBtn:hover:not(:disabled) {
-  background: #5568d3;
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
 }
 
 .indexBtn:disabled {
-  background: #ccc;
+  opacity: 0.6;
   cursor: not-allowed;
-  opacity: 0.7;
+}
+
+/* Status overlay tooltip */
+.indexBtn[data-status] {
+  position: relative;
+}
+
+.indexBtn[data-status]::after {
+  content: attr(data-status);
+  position: absolute;
+  bottom: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 100;
+}
+
+.indexBtn[data-status]:hover::after {
+  opacity: 1;
 }
 
 @keyframes spin {
@@ -311,7 +413,7 @@
 }
 
 .translateBtn {
-  background: #764ba2;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   width: 100%;
   justify-content: center;
@@ -319,19 +421,17 @@
 }
 
 .translateBtn:hover:not(:disabled) {
-  background: #63398a;
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(118, 75, 162, 0.3);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
 }
 
 .translateBtn:disabled {
-  background: #ccc;
+  opacity: 0.6;
   cursor: not-allowed;
-  opacity: 0.7;
 }
 
 .explainBtn {
-  background: #764ba2;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   width: 100%;
   justify-content: center;
@@ -339,71 +439,77 @@
 }
 
 .explainBtn:hover:not(:disabled) {
-  background: #63398a;
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(118, 75, 162, 0.3);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
 }
 
 .explainBtn:disabled {
-  background: #ccc;
+  opacity: 0.6;
   cursor: not-allowed;
-  opacity: 0.7;
 }
 
 .translationContainer {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 100px 1fr;
   gap: 16px;
+  align-items: flex-end;
   margin-bottom: 20px;
-  min-height: 280px;
 }
 
 .inputColumn {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 300px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .inputColumn .label {
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .inputColumn .textarea {
   flex: 1;
-  min-height: 280px;
+  min-height: 200px;
 }
 
 .buttonColumn {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: stretch;
-  min-width: 90px;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 100px;
 }
 
 .buttonColumn .button {
-  height: auto;
+  height: 200px;
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.4;
   white-space: pre-line;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-content: center;
 }
 
 .outputColumn {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 300px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .outputColumn .label {
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .outputColumn .textarea {
   flex: 1;
-  min-height: 280px;
+  min-height: 200px;
 }
 
 .copyButton {
@@ -411,7 +517,7 @@
   color: white;
   padding: 10px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -425,98 +531,121 @@
 }
 
 .statusBadge {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  flex: 1;
-  min-width: 150px;
+  display: none;
 }
 
 .status-indexed {
-  background: #c6f6d5;
-  color: #22543d;
-  border: 2px solid #9ae6b4;
+  display: none;
 }
 
 .status-indexing {
-  background: #feebc8;
-  color: #7c2d12;
-  border: 2px solid #fbd38d;
+  display: none;
 }
 
 .status-not-indexed {
-  background: #fed7d7;
-  color: #742a2a;
-  border: 2px solid #fc8181;
+  display: none;
 }
 
 .status-error {
-  background: #fed7d7;
-  color: #742a2a;
-  border: 2px solid #fc8181;
+  display: none;
 }
 
 .status-unknown {
-  background: #e2e8f0;
-  color: #2d3748;
-  border: 2px solid #cbd5e0;
+  display: none;
 }
 
 .textarea {
   width: 100%;
-  padding: 12px 16px;
+  padding: 12px 14px;
   border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: 'Courier New', monospace;
-  transition: border-color 0.2s ease;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  transition: all 0.2s ease;
   box-sizing: border-box;
-  margin-bottom: 12px;
-  resize: vertical;
+  resize: none;
+  background-color: #fafafa;
+}
+
+.textarea:hover:not(:disabled) {
+  border-color: #667eea;
+  background-color: white;
 }
 
 .textarea:focus {
   outline: none;
   border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background-color: white;
 }
 
 .textarea:disabled {
   background: #f5f5f5;
   cursor: not-allowed;
+  color: #999;
+  border-color: #ddd;
 }
 
 .outputTextarea {
-  background: #f9fafb;
+  background: #f5f5f5;
   border-color: #e5e7eb;
 }
 
 .error {
   background: #fee;
-  border: 2px solid #fcc;
-  color: #c33;
-  padding: 12px 16px;
+  border-left: 4px solid #f44;
   border-radius: 6px;
+  color: #c00;
+  padding: 12px 16px;
   margin-bottom: 16px;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.success {
+  background: #efe;
+  border-left: 4px solid #4f4;
+  border-radius: 6px;
+  color: #060;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 @media (max-width: 600px) {
+  .container {
+    padding: 20px 16px;
+  }
+
   .card {
-    padding: 24px;
+    padding: 20px;
+    margin-bottom: 16px;
   }
 
   .title {
-    font-size: 24px;
-    margin-bottom: 30px;
+    font-size: 28px;
+    margin-bottom: 24px;
+  }
+
+  .cardHeader {
+    margin-bottom: 16px;
+  }
+
+  .cardStep {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    margin-right: 12px;
+  }
+
+  .cardTitle {
+    font-size: 16px;
   }
 
   .endpointLineContainer {
     flex-direction: column;
     gap: 12px;
-    align-items: stretch;
   }
 
   .endpointLineContainer .comboboxContainer {
@@ -524,9 +653,22 @@
     margin-bottom: 0;
   }
 
+  .entityLimitContainer {
+    flex: 0 0 auto;
+  }
+
   .indexLineContainer {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .indexLineContainer .indexBtn {
+    grid-column: 1;
+    flex: 1;
+  }
+
+  .indexLineContainer .entityLimitContainer {
+    grid-column: 1;
   }
 
   .indexBtn {
@@ -539,15 +681,29 @@
   }
 
   .translationContainer {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 12px;
   }
 
   .buttonColumn {
-    flex: 1;
+    grid-column: 1;
+    grid-row: 1;
+    order: -1;
+    height: auto;
+    justify-content: center;
+    flex-direction: row;
   }
 
   .buttonColumn .button {
-    padding: 12px 24px;
+    height: auto;
+    flex: 1;
+  }
+
+  .textarea {
+    height: 150px;
+  }
+
+  .label {
+    font-size: 11px;
   }
 }

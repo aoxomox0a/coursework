@@ -48,15 +48,17 @@ export default function QueryTranslator() {
   // Check if endpoint is indexed
   const checkIndexStatus = async (url) => {
     try {
-      const response = await axios.post('http://localhost:8000/api/counts', {
+      const response = await axios.post('http://localhost:8000/api/check', {
         endpoint: url
       });
-      if (response.data.status === 'success' && response.data.counts.entities > 0) {
+      if (response.data.is_indexed) {
         setIndexStatus('indexed');
-        setIndexMessage(`✓ Indexed (${response.data.counts.entities} entities)`);
+        setIndexMessage('✓ Indexed');
+        console.log(`✅ Endpoint ${url} is indexed`);
       } else {
         setIndexStatus('not-indexed');
         setIndexMessage('Not indexed');
+        console.log(`⚠️  Endpoint ${url} is not indexed`);
       }
     } catch (error) {
       setIndexStatus('error');
@@ -80,7 +82,7 @@ export default function QueryTranslator() {
     }
   };
 
-  // Index & Link button
+  // Index & Link button - now with SSE streaming
   const handleIndexLink = async () => {
     if (!endpoint.trim()) {
       alert('Please enter a SPARQL endpoint URL');
@@ -99,40 +101,54 @@ export default function QueryTranslator() {
       
       await axios.post('http://localhost:8000/api/index', indexPayload);
 
-      // Keep isIndexing true and poll /counts until confirmed indexed
-      let isConfirmed = false;
-      let attempts = 0;
-      const maxAttempts = 120; // 2 minutes with 1-second intervals
-
-      while (!isConfirmed && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-        
+      // Stream status updates via SSE
+      const eventSource = new EventSource(`http://localhost:8000/api/status/stream?endpoint=${encodeURIComponent(endpoint)}`);
+      let sseTimeout;
+      
+      console.log(`🔌 [SSE] Connected to stream for ${endpoint}`);
+      
+      // Fallback: If SSE takes too long (10 minutes), assume complete
+      sseTimeout = setTimeout(() => {
+        console.warn(`⏱️ [SSE] Timeout after 10 minutes, assuming indexing complete`);
+        setIndexStatus('indexed');
+        setIndexMessage('✓ Indexing completed (timeout)');
+        setIsIndexing(false);
+        eventSource.close();
+      }, 10 * 60 * 1000);
+      
+      eventSource.onmessage = (event) => {
         try {
-          const response = await axios.post('http://localhost:8000/api/counts', {
-            endpoint: endpoint
-          });
+          const status = JSON.parse(event.data);
+          console.log(`📡 [SSE] Received status:`, status);
+          setIndexMessage(status.current_step || 'Indexing...');
           
-          if (response.data.status === 'success' && response.data.counts.entities > 0) {
-            isConfirmed = true;
+          if (!status.is_indexing) {
+            console.log(`✅ [SSE] Indexing complete! Setting status to 'indexed'`);
+            clearTimeout(sseTimeout);
             setIndexStatus('indexed');
-            setIndexMessage(`✓ Indexed (${response.data.counts.entities} entities)`);
+            setIndexMessage('✓ Indexing completed successfully!');
+            setIsIndexing(false);
+            eventSource.close();
+            console.log(`🔌 [SSE] Stream closed by client`);
           }
         } catch (error) {
-          console.log('Checking index status...', attempts);
+          console.error('❌ Error parsing SSE message:', error);
         }
-        
-        attempts++;
-      }
-
-      if (!isConfirmed) {
+      };
+      
+      eventSource.onerror = (error) => {
+        console.error('❌ [SSE] Stream error:', error);
+        console.log(`📊 Current state - isIndexing: ${isIndexing}, indexStatus: ${indexStatus}`);
+        clearTimeout(sseTimeout);
         setIndexStatus('error');
-        setIndexMessage('Indexing timeout - please try again');
-      }
+        setIndexMessage('Status stream error');
+        setIsIndexing(false);
+        eventSource.close();
+      };
     } catch (error) {
       setIndexStatus('error');
       setIndexMessage('Indexing failed');
       console.error('Indexing error:', error);
-    } finally {
       setIsIndexing(false);
     }
   };
@@ -208,185 +224,218 @@ export default function QueryTranslator() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.card}>
-        <h1 className={styles.title}>Natural Language ⇌ SPARQL</h1>
-
-        {/* ENDPOINT SECTION */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>1. Select Endpoint</h2>
-          
-          <div className={styles.labelsRow}>
-            <label className={styles.label}>SPARQL Endpoint URL</label>
-            <label className={styles.label}>Entities Amount</label>
+      <h1 className={styles.title}>Natural Language ⇌ SPARQL</h1>
+      
+      <div className={styles.mainWrapper}>
+        {/* ===== CARD 1: SELECT ENDPOINT & INDEX ===== */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardStep}>1</div>
+            <h2 className={styles.cardTitle}>Select Endpoint & Index</h2>
           </div>
-          
-          <div className={styles.endpointLineContainer}>
-            <div className={styles.comboboxContainer} ref={dropdownRef}>
-              <input
-                type="text"
-                value={endpoint}
-                onChange={(e) => {
-                  setEndpoint(e.target.value);
-                  checkIndexStatus(e.target.value);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                placeholder="http://your-sparql-endpoint/sparql"
-                className={styles.comboboxInput}
-                disabled={isIndexing}
-              />
-              <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className={styles.dropdownToggle}
-                disabled={isIndexing}
-              >
-                ▼
-              </button>
-              
-              {showDropdown && (
-                <div className={styles.dropdownList}>
-                  {PREDEFINED_QUERIES.map((query) => (
-                    <div
-                      key={query.value}
-                      className={`${styles.dropdownItem} ${endpoint === query.value ? styles.active : ''}`}
-                      onClick={() => {
-                        setEndpoint(query.value);
-                        checkIndexStatus(query.value);
-                        setShowDropdown(false);
-                      }}
-                    >
-                      {query.label}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+          <div className={styles.section}>
+            {/* Endpoint Input Row */}
+            <div style={{ marginBottom: '16px' }}>
+              <label className={styles.label}>SPARQL Endpoint URL</label>
+              <div className={styles.comboboxContainer} ref={dropdownRef}>
+                <input
+                  type="text"
+                  value={endpoint}
+                  onChange={(e) => {
+                    setEndpoint(e.target.value);
+                    checkIndexStatus(e.target.value);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  placeholder="http://your-sparql-endpoint/sparql"
+                  className={styles.comboboxInput}
+                  disabled={isIndexing}
+                />
+                
+                {showDropdown && (
+                  <div className={styles.dropdownList}>
+                    {PREDEFINED_QUERIES.map((query) => (
+                      <div
+                        key={query.value}
+                        className={`${styles.dropdownItem} ${endpoint === query.value ? styles.active : ''}`}
+                        onClick={() => {
+                          setEndpoint(query.value);
+                          checkIndexStatus(query.value);
+                          setShowDropdown(false);
+                        }}
+                      >
+                        {query.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <button
-              onClick={handleIndexLink}
-              disabled={isIndexing || indexStatus === 'indexed'}
-              className={`${styles.button} ${styles.indexBtn}`}
-            >
-              {isIndexing ? (
-                <>
-                  <span className={styles.skeleton}>⏳</span> Indexing...
-                </>
-              ) : indexStatus === 'indexed' ? (
-                '✓ Indexed'
-              ) : (
-                '📊 Index & Link'
-              )}
-            </button>
-
-            <div className={styles.entityLimitContainer}>
-              <input
-                type="number"
-                value={entityLimit}
-                onChange={(e) => setEntityLimit(e.target.value)}
-                placeholder="10000"
-                className={styles.entityLimitInput}
+            {/* Index & Entities Row */}
+            <div className={styles.indexLineContainer}>
+              {/* Index Button with Tooltip */}
+              <button
+                onClick={handleIndexLink}
                 disabled={isIndexing || indexStatus === 'indexed'}
-                min="1"
-              />
+                className={`${styles.button} ${styles.indexBtn}`}
+                data-status={indexMessage}
+                title={indexMessage}
+              >
+                {isIndexing ? (
+                  <>
+                    <span className={styles.skeleton}>⏳</span> Indexing...
+                  </>
+                ) : indexStatus === 'indexed' ? (
+                  '✓ Indexed'
+                ) : (
+                  '📊 Index & Link'
+                )}
+              </button>
+
+              {/* Entities Limit Input */}
+              <div className={styles.entityLimitContainer}>
+                <label className={styles.label}>Entities Limit</label>
+                <input
+                  type="number"
+                  value={entityLimit}
+                  onChange={(e) => setEntityLimit(e.target.value)}
+                  placeholder="10000"
+                  className={styles.entityLimitInput}
+                  disabled={isIndexing || indexStatus === 'indexed'}
+                  min="1"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* TRANSLATION SECTION */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>2. Natural Language to SPARQL</h2>
-
-          <div className={styles.translationContainer}>
-            {/* LEFT: Natural Language Input */}
-            <div className={styles.inputColumn}>
-              <label className={styles.label}>Natural Language Question</label>
-              <textarea
-                value={nlQuery}
-                onChange={(e) => setNlQuery(e.target.value)}
-                placeholder="e.g., Who directed Inception?"
-                className={styles.textarea}
-                disabled={isTranslating || indexStatus !== 'indexed'}
-              />
-            </div>
-
-            {/* MIDDLE: Translate Button */}
-            <div className={styles.buttonColumn}>
-              <button
-                onClick={handleTranslate}
-                disabled={isTranslating || indexStatus !== 'indexed'}
-                className={`${styles.button} ${styles.translateBtn}`}
-              >
-                {isTranslating ? '⏳' : '📖'}
-                <br />
-                Translate
-              </button>
-            </div>
-
-            {/* RIGHT: SPARQL Output */}
-            <div className={styles.outputColumn}>
-              <label className={styles.label}>SPARQL Query Output</label>
-              <textarea
-                value={sparqlQuery}
-                readOnly
-                placeholder="SPARQL query will appear here..."
-                className={`${styles.textarea} ${styles.outputTextarea}`}
-              />
-            </div>
+        {/* ===== CARD 2: NL TO SPARQL ===== */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardStep}>2</div>
+            <h2 className={styles.cardTitle}>Natural Language to SPARQL</h2>
           </div>
 
-          {translationError && (
-            <div className={styles.error}>
-              ✗ {translationError}
+          <div className={styles.section}>
+            <div className={styles.translationContainer}>
+              {/* LEFT: Natural Language Input */}
+              <div className={styles.inputColumn}>
+                <label className={styles.label}>Natural Language Question</label>
+                <textarea
+                  value={nlQuery}
+                  onChange={(e) => setNlQuery(e.target.value)}
+                  placeholder="e.g., Who directed Inception?"
+                  className={styles.textarea}
+                  disabled={isTranslating || indexStatus !== 'indexed'}
+                />
+              </div>
+
+              {/* MIDDLE: Translate Button */}
+              <div className={styles.buttonColumn}>
+                <button
+                  onClick={handleTranslate}
+                  disabled={isTranslating || indexStatus !== 'indexed'}
+                  className={`${styles.button} ${styles.translateBtn}`}
+                >
+                  {isTranslating ? (
+                    <>
+                      <span className={styles.skeleton}>⏳</span>
+                      <br />
+                      Translate
+                    </>
+                  ) : (
+                    <>
+                      📖
+                      <br />
+                      Translate
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* RIGHT: SPARQL Output */}
+              <div className={styles.outputColumn}>
+                <label className={styles.label}>SPARQL Query Output</label>
+                <textarea
+                  value={sparqlQuery}
+                  readOnly
+                  placeholder="SPARQL query will appear here..."
+                  className={`${styles.textarea} ${styles.outputTextarea}`}
+                />
+              </div>
             </div>
-          )}
+
+            {translationError && (
+              <div className={styles.error}>
+                ✗ {translationError}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* EXPLANATION SECTION */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>3. SPARQL to Natural Language</h2>
-
-          <div className={styles.translationContainer}>
-            {/* LEFT: SPARQL Input */}
-            <div className={styles.inputColumn}>
-              <label className={styles.label}>SPARQL Query Input</label>
-              <textarea
-                value={sparqlInput}
-                onChange={(e) => setSparqlInput(e.target.value)}
-                placeholder="e.g., SELECT ?name WHERE { ?x rdf:type Person; foaf:name ?name }"
-                className={styles.textarea}
-                disabled={isExplaining}
-              />
-            </div>
-
-            {/* MIDDLE: Explain Button */}
-            <div className={styles.buttonColumn}>
-              <button
-                onClick={handleExplain}
-                disabled={isExplaining}
-                className={`${styles.button} ${styles.explainBtn}`}
-              >
-                {isExplaining ? '⏳' : '📖'}
-                <br />
-                Translate
-              </button>
-            </div>
-
-            {/* RIGHT: Natural Language Output */}
-            <div className={styles.outputColumn}>
-              <label className={styles.label}>Natural Language Explanation</label>
-              <textarea
-                value={nlExplanation}
-                readOnly
-                placeholder="Explanation will appear here..."
-                className={`${styles.textarea} ${styles.outputTextarea}`}
-              />
-            </div>
+        {/* ===== CARD 3: SPARQL TO NL ===== */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div className={styles.cardStep}>3</div>
+            <h2 className={styles.cardTitle}>SPARQL to Natural Language</h2>
           </div>
 
-          {explanationError && (
-            <div className={styles.error}>
-              ✗ {explanationError}
+          <div className={styles.section}>
+            <div className={styles.translationContainer}>
+              {/* LEFT: SPARQL Input */}
+              <div className={styles.inputColumn}>
+                <label className={styles.label}>SPARQL Query Input</label>
+                <textarea
+                  value={sparqlInput}
+                  onChange={(e) => setSparqlInput(e.target.value)}
+                  placeholder="e.g., SELECT ?name WHERE { ?x rdf:type Person; foaf:name ?name }"
+                  className={styles.textarea}
+                  disabled={isExplaining}
+                />
+              </div>
+
+              {/* MIDDLE: Explain Button */}
+              <div className={styles.buttonColumn}>
+                <button
+                  onClick={handleExplain}
+                  disabled={isExplaining}
+                  className={`${styles.button} ${styles.explainBtn}`}
+                >
+                  {isExplaining ? (
+                    <>
+                      <span className={styles.skeleton}>⏳</span>
+                      <br />
+                      Translate
+                    </>
+                  ) : (
+                    <>
+                      📖
+                      <br />
+                      Translate
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* RIGHT: Natural Language Output */}
+              <div className={styles.outputColumn}>
+                <label className={styles.label}>Natural Language Explanation</label>
+                <textarea
+                  value={nlExplanation}
+                  readOnly
+                  placeholder="Explanation will appear here..."
+                  className={`${styles.textarea} ${styles.outputTextarea}`}
+                />
+              </div>
             </div>
-          )}
+
+            {explanationError && (
+              <div className={styles.error}>
+                ✗ {explanationError}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

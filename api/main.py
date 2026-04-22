@@ -23,13 +23,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # --- STARTUP ---
     logger.info("Wakiing up the API...")
-    if not is_endpoint_indexed(SPARQL_ENDPOINT):
-        logger.warning(
-            f"Index missing for {SPARQL_ENDPOINT}. Bob the Builder is on it..."
-        )
-        asyncio.create_task(managed_indexing_task(SPARQL_ENDPOINT))
-    else:
-        logger.info("Index verified. System fired up")
+    # Disabled: Auto-index on startup. User can trigger from UI instead.
+    # if not is_endpoint_indexed(SPARQL_ENDPOINT):
+    #     logger.warning(
+    #         f"Index missing for {SPARQL_ENDPOINT}. Bob the Builder is on it..."
+    #     )
+    #     asyncio.create_task(managed_indexing_task(SPARQL_ENDPOINT))
+    # else:
+    logger.info("System ready - indexing can be triggered from UI")
 
     yield
     # --- SHUTDOWN ---

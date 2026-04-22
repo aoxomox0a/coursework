@@ -7,7 +7,7 @@ from typing import Dict
 
 
 async def run_indexing_pipeline(
-    custom_endpoint: str = None, status_callback=None
+    custom_endpoint: str = None, status_callback=None, max_entities: int = None
 ) -> Dict:
     """
     Execute the complete indexing pipeline:
@@ -21,6 +21,7 @@ async def run_indexing_pipeline(
     Args:
         custom_endpoint: Optional custom SPARQL endpoint URL
         status_callback: Optional callback function to receive status updates
+        max_entities: Optional maximum number of entities to fetch
 
     Returns:
         Dict with status and indexed counts, or False on error
@@ -55,19 +56,22 @@ async def run_indexing_pipeline(
     send_status("▸ Fetching schema classes...")
     fetched_classes = await entities.fetch_classes()
 
-    # Step 3: Fetch entities (respect LIMIT_ENTITIES from config)
+    # Step 3: Fetch entities (respect max_entities parameter or LIMIT_ENTITIES from config)
     send_status("▸ Fetching entities from SPARQL endpoint...")
     import math
 
+    # Use max_entities parameter if provided, otherwise use config
+    entity_limit = max_entities if max_entities is not None else LIMIT_ENTITIES
+    
     required_batches = (
-        max(1, math.ceil(LIMIT_ENTITIES / BATCH_SIZE)) if LIMIT_ENTITIES > 0 else None
+        max(1, math.ceil(entity_limit / BATCH_SIZE)) if entity_limit > 0 else None
     )
     fetched_entities = await entities.fetch_entities_batch(
         batch_size=BATCH_SIZE,
         max_batches=required_batches,
     )
-    if LIMIT_ENTITIES > 0:
-        fetched_entities = fetched_entities[:LIMIT_ENTITIES]
+    if entity_limit > 0:
+        fetched_entities = fetched_entities[:entity_limit]
 
     if not fetched_entities:
         send_status("⊘ No entities fetched, continuing with schema only...")

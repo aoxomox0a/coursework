@@ -100,10 +100,58 @@ def is_endpoint_indexed(endpoint: str = None) -> bool:
         client = _get_client()
         existing = {c.name for c in client.list_collections()}
         props_name = get_collection_name("properties", endpoint)
+        
         if props_name not in existing:
+            print(f"  📭 Collection '{props_name}' does not exist - not indexed yet")
             return False
-        return client.get_collection(name=props_name).count() > 0
-    except Exception:
+        
+        collection = client.get_collection(name=props_name)
+        count = collection.count()
+        print(f"  📊 Collection '{props_name}' exists with {count} items")
+        
+        result = count > 0
+        print(f"  → is_indexed: {result}")
+        return result
+    except Exception as e:
+        print(f"  ⚠️  Error checking if indexed: {e}")
+        return False
+
+
+def delete_endpoint_index(endpoint: str) -> bool:
+    """
+    Delete all ChromaDB collections for a specific endpoint.
+    
+    Args:
+        endpoint: SPARQL endpoint URL
+    
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    try:
+        client = _get_client()
+        collections_to_delete = [
+            "entities",
+            "properties", 
+            "classes",
+            "sample_triples",
+            "class_entity_mappings"
+        ]
+        
+        deleted_count = 0
+        for base_name in collections_to_delete:
+            collection_name = get_collection_name(base_name, endpoint)
+            try:
+                client.delete_collection(name=collection_name)
+                print(f"  🗑️  Deleted collection '{collection_name}'")
+                deleted_count += 1
+            except Exception as e:
+                # Collection might not exist, that's fine
+                pass
+        
+        print(f"\n✓ Deleted {deleted_count} collections for endpoint: {endpoint}\n")
+        return True
+    except Exception as e:
+        print(f"  ⚠️  Error deleting endpoint index: {e}")
         return False
 
 
