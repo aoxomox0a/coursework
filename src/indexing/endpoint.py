@@ -23,15 +23,9 @@ def get_endpoint() -> str:
 
 
 async def test_connection():
-    """Test connection to SPARQL endpoint with a simple query."""
-    query = """
-    SELECT ?s ?label
-    WHERE {
-        ?s rdfs:label "Albert Einstein"@en .
-        ?s rdfs:label ?label .
-    }
-    LIMIT 1
-    """
+    """Return True iff the endpoint responds to a generic SPARQL probe (ASK query)."""
+    # Endpoint-agnostic: any conformant SPARQL 1.1 endpoint with any triple returns true.
+    query = "ASK { ?s ?p ?o }"
 
     current_endpoint = get_endpoint()
     print(f"Testing connection to: {current_endpoint}")
@@ -47,12 +41,14 @@ async def test_connection():
             response.raise_for_status()
             data = response.json()
 
-            if "results" in data and "bindings" in data["results"]:
+            # ASK returns {"boolean": true/false}; legacy SELECT-shaped responses also accepted.
+            if "boolean" in data or (
+                "results" in data and "bindings" in data.get("results", {})
+            ):
                 print("✓ Connection successful!")
                 return True
-            else:
-                print("✓ Connection OK (no results for test query)")
-                return True
+            print("✗ Connection OK but response shape unexpected")
+            return False
 
         except Exception as e:
             print(f"✗ Connection failed: {e}")
