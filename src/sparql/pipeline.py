@@ -10,6 +10,26 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 
+def _load_profile_or_none():
+    """Try to derive a KGProfile for the current endpoint from the indexed state.
+
+    Returns None (and falls back to the legacy prompt) when indexing has not
+    been run yet for this endpoint, so the SPARQL pipeline keeps working even
+    before the agnostic pipeline has been bootstrapped.
+    """
+    try:
+        from src.indexing.endpoint import get_endpoint
+        from src.kg_profiles import profile_from_index
+
+        return profile_from_index(get_endpoint())
+    except FileNotFoundError:
+        logger.info("No persisted KG profile for the current endpoint — using legacy prompt")
+        return None
+    except Exception as exc:  # defensive: never fail the SPARQL pipeline on a profile issue
+        logger.warning("Failed to load KG profile (%s) — using legacy prompt", exc)
+        return None
+
+
 class SparqlPipelineResult(TypedDict):
     status: str
     answer: str
@@ -54,11 +74,13 @@ async def run_sparql_pipeline(
 
     # Step 1: Generate prompt and call LLM
     logger.info("Generating SPARQL prompt for: %s", question)
+    profile = _load_profile_or_none()
     sparql_prompt = prompt.generate_sparql_prompt(
         question=question,
         entity_uris=entity_uris,
         property_uri=property_uri,
         related_properties=related,
+        profile=profile,
     )
 
     raw_response = await llm.call_llm(sparql_prompt)

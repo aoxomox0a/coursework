@@ -2,7 +2,14 @@
 LLM prompt templates for SPARQL generation.
 Optimized for instruction-tuned small models (Mistral-7b, Llama, etc.) via Hactar/HuggingFace.
 Output is always wrapped in ```sparql ... ``` fences for reliable extraction.
+
+Two templates coexist:
+- SPARQL_GENERATION_TEMPLATE (legacy) — fires when no KGProfile is passed.
+  Preserved verbatim so existing DBpedia callers see identical output.
+- SPARQL_PROFILE_TEMPLATE (new) — fires when a KGProfile is supplied; prefixes,
+  one-shot examples and style hints are injected from the profile.
 """
+from src.kg_profiles import KGProfile, OneShotExample
 
 SPARQL_GENERATION_TEMPLATE = """\
 You are a SPARQL query generator. Your only output is a valid SPARQL query wrapped in a code fence.
@@ -43,6 +50,41 @@ SELECT ?capital WHERE {{
   <http://dbpedia.org/resource/France> dbo:capital ?capital .
 }}
 ```
+
+## Now generate the query for the question above.
+
+```sparql
+"""
+
+SPARQL_PROFILE_TEMPLATE = """\
+You are a SPARQL query generator. Your only output is a valid SPARQL query wrapped in a code fence.
+
+## Rules
+- Output EXACTLY one ```sparql ... ``` block — nothing before, nothing after.
+- Declare only the PREFIX aliases you actually use in the query body.
+- Use ONLY the URIs provided below. Do NOT invent new URIs or properties.
+- Default to SELECT unless the question requires ASK or DESCRIBE.
+- Every query must have a WHERE {{ }} clause with at least one triple pattern.
+{style_hints}
+
+## Available prefixes (for this endpoint)
+{prefix_block}
+
+## Examples
+{one_shot_block}
+
+## Input
+
+Question: {question}
+
+Entity URIs (use these as subjects or objects in triple patterns):
+{entity_uris}
+
+Main property URI (the relation that links entities):
+<{property_uri}>
+
+Additional candidate properties (use if they add precision):
+{related_properties}
 
 ## Now generate the query for the question above.
 
@@ -99,43 +141,94 @@ Natural Language Question:
 """
 
 
+def _render_entity_list(entity_uris: list[str]) -> str:
+    if not entity_uris:
+        return "  (none provided)"
+    return "\n".join(f"  <{uri}>" for uri in entity_uris)
+
+
+def _render_related_list(related_properties: list[str]) -> str:
+    if not related_properties:
+        return "  (none)"
+    return "\n".join(f"  <{p}>" for p in related_properties)
+
+
+def _render_prefix_block(prefixes: tuple[tuple[str, str], ...]) -> str:
+    if not prefixes:
+        return "(no prefixes registered)"
+    return "\n".join(f"PREFIX {alias}: <{ns}>" for alias, ns in prefixes)
+
+
+def _render_one_shot_block(examples: tuple[OneShotExample, ...], limit: int = 2) -> str:
+    if not examples:
+        return "(no curated examples available for this endpoint — rely on the rules above)"
+    rendered = []
+    for ex in examples[:limit]:
+        ent_list = (
+            "\n".join(f"  <{u}>" for u in ex.entity_uris)
+            if ex.entity_uris
+            else "  (none)"
+        )
+        prop = f"<{ex.property_uri}>" if ex.property_uri else "(none)"
+        rendered.append(
+            f"Question: {ex.question}\n"
+            f"Entities:\n{ent_list}\n"
+            f"Property: {prop}\n\n"
+            f"```sparql\n{ex.sparql}\n```"
+        )
+    return "\n\n".join(rendered)
+
+
+def _render_style_hints(hints: tuple[str, ...]) -> str:
+    if not hints:
+        return ""
+    return "\n## Notes for this endpoint\n" + "\n".join(f"- {h}" for h in hints)
+
+
 def generate_sparql_prompt(
     question: str,
     entity_uris: list[str],
     property_uri: str,
     related_properties: list[str] | None = None,
+    profile: KGProfile | None = None,
 ) -> str:
     """
     Generate an LLM prompt for SPARQL query generation.
 
     Args:
-        question: Natural language question
-        entity_uris: List of linked entity URIs
-        property_uri: Main property/relation URI
-        related_properties: Optional list of additional candidate property URIs
+        question: Natural language question.
+        entity_uris: List of linked entity URIs.
+        property_uri: Main property/relation URI.
+        related_properties: Optional list of additional candidate property URIs.
+        profile: Optional KGProfile. When None, the legacy DBpedia-flavored
+            template is used verbatim (backward-compatible). When provided,
+            prefixes, one-shot examples and style hints come from the profile.
 
     Returns:
-        Formatted prompt string with ```sparql fence instruction
+        Formatted prompt string with ```sparql fence instruction.
     """
     if related_properties is None:
         related_properties = []
 
-    entity_list = (
-        "\n".join(f"  <{uri}>" for uri in entity_uris)
-        if entity_uris
-        else "  (none provided)"
-    )
-    related_list = (
-        "\n".join(f"  <{p}>" for p in related_properties)
-        if related_properties
-        else "  (none)"
-    )
+    entity_list = _render_entity_list(entity_uris)
+    related_list = _render_related_list(related_properties)
 
-    return SPARQL_GENERATION_TEMPLATE.format(
+    if profile is None:
+        return SPARQL_GENERATION_TEMPLATE.format(
+            question=question,
+            entity_uris=entity_list,
+            property_uri=property_uri,
+            related_properties=related_list,
+        )
+
+    return SPARQL_PROFILE_TEMPLATE.format(
         question=question,
         entity_uris=entity_list,
         property_uri=property_uri,
         related_properties=related_list,
+        prefix_block=_render_prefix_block(profile.prefixes),
+        one_shot_block=_render_one_shot_block(profile.one_shot_examples),
+        style_hints=_render_style_hints(profile.query_style_hints),
     )
 
 
