@@ -150,6 +150,76 @@ def test_profile_from_index_raises_when_sidecar_missing(tmp_path, monkeypatch):
         profile_from_index("http://never-indexed.example/sparql")
 
 
+def test_profile_from_index_loads_curated_one_shots(tmp_path, monkeypatch):
+    """profile_from_index should pull one-shots from the curated layer when present."""
+    import json
+
+    _write_sidecar(
+        tmp_path,
+        monkeypatch,
+        slug="orkg",
+        payload={
+            "endpoint_url": "https://orkg.org/triplestore",
+            "slug": "orkg",
+            "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
+            "property_typing": "untyped_fallback",
+            "class_typing": "rdfs_class",
+            "has_language_tags": False,
+            "probed_at": "2026-04-22T12:00:00",
+        },
+    )
+    monkeypatch.setattr(
+        "src.kg_profiles.introspection._fetch_uris_from_chroma",
+        lambda collection, endpoint: ["http://orkg.org/orkg/predicate/P31"],
+    )
+    # Stage a curated file
+    curated_dir = tmp_path / "curated"
+    curated_dir.mkdir()
+    monkeypatch.setattr("src.kg_profiles.curated.CURATED_DIR", curated_dir)
+    (curated_dir / "orkg.json").write_text(
+        json.dumps(
+            [
+                {
+                    "question": "What is the research field of paper X?",
+                    "entity_uris": ["http://orkg.org/orkg/resource/R123"],
+                    "property_uri": "http://orkg.org/orkg/predicate/P30",
+                    "sparql": "SELECT ?f WHERE { orkgr:R123 orkgp:P30 ?f }",
+                    "tags": ["factoid"],
+                }
+            ]
+        )
+    )
+
+    profile = profile_from_index("https://orkg.org/triplestore")
+    assert len(profile.one_shot_examples) == 1
+    assert profile.one_shot_examples[0].question == "What is the research field of paper X?"
+
+
+def test_profile_from_index_empty_one_shots_when_no_curated_file(tmp_path, monkeypatch):
+    # get_endpoint_slug derives slug "x" from "http://x/sparql"; sidecar must match.
+    _write_sidecar(
+        tmp_path,
+        monkeypatch,
+        slug="x",
+        payload={
+            "endpoint_url": "http://x/sparql",
+            "slug": "x",
+            "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
+            "property_typing": "rdf_property",
+            "class_typing": "rdfs_class",
+            "has_language_tags": True,
+            "probed_at": "2026-04-22T12:00:00",
+        },
+    )
+    monkeypatch.setattr(
+        "src.kg_profiles.introspection._fetch_uris_from_chroma",
+        lambda collection, endpoint: ["http://example.org/p"],
+    )
+    monkeypatch.setattr("src.kg_profiles.curated.CURATED_DIR", tmp_path / "no_curated")
+    profile = profile_from_index("http://x/sparql")
+    assert profile.one_shot_examples == ()
+
+
 def test_profile_from_index_carries_link_strategy_default(tmp_path, monkeypatch):
     _write_sidecar(
         tmp_path,

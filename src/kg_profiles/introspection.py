@@ -15,6 +15,7 @@ from typing import Iterable
 from src.indexing.chroma_storage import get_chroma_client, get_collection_name
 from src.indexing.discovery import load_profile as _load_discovery_profile
 from src.kg_profiles.base import KGProfile
+from src.kg_profiles.curated import load_curated_one_shots
 
 # Stable alias -> namespace table for widely used vocabularies. When a URI
 # namespace matches one of these, the alias is used verbatim instead of a
@@ -126,6 +127,6 @@ def profile_from_index(endpoint: str) -> KGProfile:
         label=discovered.slug.replace("_", " ").title(),
         endpoint_url=discovered.endpoint_url,
         prefixes=prefixes,
-        one_shot_examples=(),
+        one_shot_examples=load_curated_one_shots(discovered.slug),
         label_predicate=short_label_predicate,
     )
