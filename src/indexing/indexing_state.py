@@ -19,11 +19,20 @@ _status: dict = {
 }
 _lock = threading.Lock()
 
+# SSE event queues for streaming status updates (per endpoint)
+_sse_queues: dict[str, list] = {}
+_sse_lock = threading.Lock()
+
 
 def toggle_indexing_state(is_active: bool):
     """Safely toggle the indexing status lock for the UI."""
     with _lock:
         _status["is_indexing"] = is_active
+    
+    # Broadcast the state change to SSE clients
+    endpoint = _status.get("endpoint")
+    if endpoint:
+        broadcast_status_update(endpoint)
 
 
 def update_status(step: str, endpoint: str = None, error: str = None) -> None:
@@ -33,6 +42,10 @@ def update_status(step: str, endpoint: str = None, error: str = None) -> None:
             _status["endpoint"] = endpoint
         if error is not None:
             _status["error"] = error
+    
+    # Broadcast update to SSE clients if endpoint is set
+    if endpoint:
+        broadcast_status_update(endpoint)
 
 
 def get_status() -> dict:
@@ -77,3 +90,31 @@ def trigger_background_indexing(endpoint: str) -> None:
                 _status["is_indexing"] = False
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def register_sse_client(endpoint: str, q: asyncio.Queue) -> None:
+    """Register a new SSE client queue for an endpoint."""
+    with _sse_lock:
+        if endpoint not in _sse_queues:
+            _sse_queues[endpoint] = []
+        _sse_queues[endpoint].append(q)
+
+
+def unregister_sse_client(endpoint: str, q: asyncio.Queue) -> None:
+    """Unregister an SSE client for an endpoint."""
+    with _sse_lock:
+        if endpoint in _sse_queues and q in _sse_queues[endpoint]:
+            _sse_queues[endpoint].remove(q)
+
+
+def broadcast_status_update(endpoint: str) -> None:
+    """Broadcast current status to all SSE clients for an endpoint."""
+    status = get_status()
+    with _sse_lock:
+        if endpoint in _sse_queues:
+            for q in _sse_queues[endpoint]:
+                try:
+                    # Use put_nowait for asyncio.Queue
+                    q.put_nowait(status)
+                except asyncio.QueueFull:
+                    pass

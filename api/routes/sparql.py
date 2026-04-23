@@ -50,6 +50,72 @@ class ExplainResponse(BaseModel):
     error: str | None = None
 
 
+class GenerateSparqlRequest(BaseModel):
+    question: str = Field(
+        ..., min_length=1, max_length=1000, description="Natural language question"
+    )
+
+
+class GenerateSparqlResponse(BaseModel):
+    status: str
+    question: str
+    sparql_query: str
+    error: str | None = None
+
+
+@router.post("/generate-sparql")
+async def generate_sparql(request: GenerateSparqlRequest):
+    """
+    Generate SPARQL query from natural language (without executing).
+    Use this after indexing to get just the SPARQL query.
+
+    Args:
+        request: GenerateSparqlRequest with 'question' field
+
+    Returns:
+        GenerateSparqlResponse with status, question, and SPARQL query
+    """
+    if not is_endpoint_indexed(SPARQL_ENDPOINT):
+        status_msg = (
+            "Endpoint indexing is currently in progress."
+            if is_indexing_in_progress()
+            else "Endpoint index is missing or failed to initialize on startup."
+        )
+        logger.warning(
+            f"SPARQL generation rejected: Index unavailable for {SPARQL_ENDPOINT}. State: {status_msg}"
+        )
+        return JSONResponse(
+            status_code=202 if is_indexing_in_progress() else 503,
+            content={
+                "status": "indexing" if is_indexing_in_progress() else "error",
+                "message": f"{status_msg} Please try again later.",
+            },
+        )
+
+    try:
+        linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
+        single_linking_result = linking_result[0]
+        result = await run_sparql_pipeline(request.question, single_linking_result)
+    except Exception as exc:
+        logger.error("SPARQL generation error for question '%s': %s", request.question, exc)
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+    if result["status"] == "error":
+        return GenerateSparqlResponse(
+            status="error",
+            question=request.question,
+            sparql_query=result.get("sparql_query", ""),
+            error=result.get("error_message"),
+        )
+
+    return GenerateSparqlResponse(
+        status="success",
+        question=request.question,
+        sparql_query=result.get("sparql_query", ""),
+        error=None,
+    )
+
+
 @router.post("/answer")
 async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
     """

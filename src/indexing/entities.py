@@ -310,7 +310,7 @@ async def fetch_entities_batch(
     offset = 0
     batch_count = 0
 
-    print(f"Fetching entities in batches (batch_size: {batch_size})...")
+    print(f"\n📦 Fetching entities in batches (batch_size: {batch_size}, max_batches: {max_batches})...\n")
 
     # 1. create list of tasks to run
     tasks = []
@@ -330,10 +330,12 @@ async def fetch_entities_batch(
         tasks.append(query_sparql(query))
 
     # 2. fire all queries at the same time
+    print(f"⏳ Downloading {len(tasks)} batches concurrently...\n")
     all_results = await asyncio.gather(*tasks)
 
-    # 3. process retunred list
-    for results in all_results:
+    # 3. process returned list and show batch progress
+    for batch_idx, results in enumerate(all_results, 1):
+        batch_entities_count = 0
         if (
             isinstance(results, dict)
             and "results" in results
@@ -346,6 +348,13 @@ async def fetch_entities_batch(
                 }
                 if entity["uri"] and entity["label"]:
                     all_entities.append(entity)
+                    batch_entities_count += 1
+        
+        # Show progress per batch
+        if batch_entities_count > 0:
+            print(f"  ✓ Batch {batch_idx:3d}: {batch_entities_count:4d} entities (total: {len(all_entities):,})")
+        else:
+            print(f"  ✗ Batch {batch_idx:3d}: No entities (fetch completed)")
 
-    print(f"✓ Fetched {len(all_entities)} entities total")
+    print(f"\n✓ Fetched {len(all_entities):,} entities total\n")
     return all_entities
