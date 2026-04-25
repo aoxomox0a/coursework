@@ -1,10 +1,12 @@
 """SPARQL Endpoint Connection - Connect to and query the SPARQL endpoint."""
 
 import httpx
+from typing import Optional
 from config.settings import SPARQL_ENDPOINT
 
 # Global variable to override default endpoint
 _current_endpoint = None
+
 
 # Headers for SPARQL requests
 HEADERS = {"User-Agent": "NL-to-SPARQL-Agent/1.0 (Knowledge Graph Indexing System)"}
@@ -36,7 +38,7 @@ async def test_connection():
                 current_endpoint,
                 params={"query": query, "format": "json"},
                 headers=HEADERS,
-                timeout=60,
+                timeout=120,
             )
             response.raise_for_status()
             data = response.json()
@@ -55,7 +57,9 @@ async def test_connection():
             return False
 
 
-async def query_sparql(query: str, format: str = "json") -> dict:
+async def query_sparql(
+    query: str, format: str = "json", client: Optional[httpx.AsyncClient] = None
+) -> dict:
     """
     Execute a SPARQL query on the endpoint.
 
@@ -66,14 +70,30 @@ async def query_sparql(query: str, format: str = "json") -> dict:
     Returns:
         Query results as dict
     """
-    async with httpx.AsyncClient(follow_redirects=True) as client:
+    current_endpoint = get_endpoint()
+
+    # If a shared client is passed in, use it
+    if client:
         try:
-            current_endpoint = get_endpoint()
             response = await client.get(
                 current_endpoint,
                 params={"query": query, "format": format},
                 headers=HEADERS,
-                timeout=60,
+                timeout=120,  # Keep the bumped timeout!
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Error executing SPARQL query: {e}")
+            return {}
+
+    async with httpx.AsyncClient(follow_redirects=True) as new_client:
+        try:
+            response = await new_client.get(
+                current_endpoint,
+                params={"query": query, "format": format},
+                headers=HEADERS,
+                timeout=120,
             )
             response.raise_for_status()
             return response.json()

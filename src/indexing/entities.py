@@ -6,6 +6,7 @@ language tags). Default values preserve the original DBpedia-targeted behavior.
 """
 
 import asyncio
+import httpx
 
 from src.indexing.endpoint import query_sparql
 from config.settings import LIMIT_ENTITIES, DEFAULT_MAX_BATCHES
@@ -30,7 +31,6 @@ async def get_total_entity_count(sparql_endpoint: str = None) -> int:
         Total count of entities
     """
     from src.indexing.endpoint import query_sparql_custom
-    import httpx
     from config.settings import SPARQL_ENDPOINT
 
     # Try different query approaches to get accurate count
@@ -114,9 +114,7 @@ async def fetch_entities(
     {limit_clause}
     """
 
-    print(
-        f"Fetching entities (limit: {limit if limit != -1 else 'unlimited'})..."
-    )
+    print(f"Fetching entities (limit: {limit if limit != -1 else 'unlimited'})...")
 
     results = await query_sparql(query)
     entities = []
@@ -379,28 +377,40 @@ async def fetch_entities_batch(
     """
     all_entities = []
 
-    print(f"\n📦 Fetching entities in batches (batch_size: {batch_size}, max_batches: {max_batches})...\n")
+    print(
+        f"\n📦 Fetching entities in batches (batch_size: {batch_size}, max_batches: {max_batches})...\n"
+    )
+    semaphore = asyncio.Semaphore(10)  # wikidata strict about concurrent requests
 
-    tasks = []
-    for batch_count in range(max_batches):
-        offset = batch_count * batch_size
-        query = f"""
-        SELECT ?entity ?label
-        WHERE {{
-            ?entity <{label_predicate}> ?label ;
-                    rdf:type ?type .
-            {_lang_filter("label", require_lang_en)}
-        }}
-        LIMIT {batch_size}
-        OFFSET {offset}
-        """
-        tasks.append(query_sparql(query))
+    # Wrap the entire batching process in ONE shared connection pool
 
-    # 2. fire all queries at the same time
-    print(f"⏳ Downloading {len(tasks)} batches concurrently...\n")
-    all_results = await asyncio.gather(*tasks)
+    async with httpx.AsyncClient(follow_redirects=True) as shared_client:
 
-    # 3. process returned list and show batch progress
+        async def fetch_with_limit(q: str):
+            async with semaphore:
+                # pass shared client to endpoint logic
+                return await query_sparql(q, client=shared_client)
+
+        tasks = []
+        for batch_count in range(max_batches):
+            offset = batch_count * batch_size
+            query = f"""
+            SELECT ?entity ?label
+            WHERE {{
+                ?entity <{label_predicate}> ?label ;
+                        rdf:type ?type .
+                {_lang_filter("label", require_lang_en)}
+            }}
+            LIMIT {batch_size}
+            OFFSET {offset}
+            """
+            tasks.append(fetch_with_limit(query))
+
+        # 2. fire all queries at the same time
+        print(f"⏳ Downloading {len(tasks)} batches concurrently...\n")
+        all_results = await asyncio.gather(*tasks)
+
+        # 3. process returned list and show batch progress
     for batch_idx, results in enumerate(all_results, 1):
         batch_entities_count = 0
         if (
@@ -419,7 +429,9 @@ async def fetch_entities_batch(
 
         # Show progress per batch
         if batch_entities_count > 0:
-            print(f"  ✓ Batch {batch_idx:3d}: {batch_entities_count:4d} entities (total: {len(all_entities):,})")
+            print(
+                f"  ✓ Batch {batch_idx:3d}: {batch_entities_count:4d} entities (total: {len(all_entities):,})"
+            )
         else:
             print(f"  ✗ Batch {batch_idx:3d}: No entities (fetch completed)")
 
