@@ -21,11 +21,16 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
 
     with torch.no_grad():
         for doc in nlp.pipe(questions, batch_size=8):
-            # entities not used atm for some reason
+            # Union NER + noun phrases + noun chunks for endpoint-agnostic coverage.
+            # ADR 0001 showed noun chunks give 100% coverage on ORKG-domain questions
+            # where NER alone covers only 60%.
             extracted_entities = entity_extraction.extract_entities(doc)
             noun_phrases = entity_extraction.extract_noun_phrases(doc)
+            noun_chunks = entity_extraction.extract_noun_chunks(doc)
 
-            entity_strings = [ent[0] for ent in extracted_entities]
+            entity_strings = entity_extraction.combine_candidates(
+                extracted_entities, noun_phrases, noun_chunks
+            )
             linking_results = entity_linking.link_entities(entity_strings)
             entity_uris = entity_linking.disambiguate_entities(linking_results)
 

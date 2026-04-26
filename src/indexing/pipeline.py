@@ -1,6 +1,6 @@
 """Indexing Pipeline - Orchestrate the entity indexing workflow."""
 
-from src.indexing import endpoint, entities, embedding, chroma_storage
+from src.indexing import endpoint, entities, embedding, chroma_storage, discovery
 from config.settings import BATCH_SIZE, LIMIT_ENTITIES
 import asyncio
 from typing import Dict
@@ -49,12 +49,34 @@ async def run_indexing_pipeline(
             f"Cannot reach SPARQL endpoint at {custom_endpoint or 'default'}"
         )
 
+    # Step 1b: Probe endpoint conventions (label predicate, typing, language tags)
+    active_endpoint = endpoint.get_endpoint()
+    send_status("▸ Probing endpoint conventions (label predicate, typing)...")
+    profile = await discovery.discover_profile(active_endpoint)
+    discovery.save_profile(profile)
+    send_status(
+        f"  ↳ label={profile.label_predicate.rsplit('#', 1)[-1]}, "
+        f"properties={profile.property_typing}, classes={profile.class_typing}, "
+        f"lang={'en' if profile.has_language_tags else 'untagged'}"
+    )
+
+    prop_type_uri = discovery.property_type_uri_for(profile.property_typing)
+    class_type_uri = discovery.class_type_uri_for(profile.class_typing)
+
     # Step 2: Fetch schema (properties and classes)
     send_status("▸ Fetching schema properties...")
-    fetched_properties = await entities.fetch_properties()
+    fetched_properties = await entities.fetch_properties(
+        property_type_uri=prop_type_uri,
+        label_predicate=profile.label_predicate,
+        require_lang_en=profile.has_language_tags,
+    )
 
     send_status("▸ Fetching schema classes...")
-    fetched_classes = await entities.fetch_classes()
+    fetched_classes = await entities.fetch_classes(
+        class_type_uri=class_type_uri,
+        label_predicate=profile.label_predicate,
+        require_lang_en=profile.has_language_tags,
+    )
 
     # Step 3: Fetch entities (respect max_entities parameter or LIMIT_ENTITIES from config)
     send_status("▸ Fetching entities from SPARQL endpoint...")
@@ -69,6 +91,8 @@ async def run_indexing_pipeline(
     fetched_entities = await entities.fetch_entities_batch(
         batch_size=BATCH_SIZE,
         max_batches=required_batches,
+        label_predicate=profile.label_predicate,
+        require_lang_en=profile.has_language_tags,
     )
     if entity_limit > 0:
         fetched_entities = fetched_entities[:entity_limit]

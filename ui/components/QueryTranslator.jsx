@@ -271,7 +271,7 @@ export default function QueryTranslator() {
       });
 
       if (response.data.status === 'success') {
-        setNlExplanation(response.data.explanation || '');
+        setNlExplanation(response.data.question || '');
         setExplanationError('');
       } else {
         setExplanationError(response.data.error || 'Explanation failed');

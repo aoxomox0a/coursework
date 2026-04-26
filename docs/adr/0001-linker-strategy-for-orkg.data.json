@@ -1,0 +1,214 @@
+{
+  "seed": 42,
+  "sample_size": 10,
+  "model": "en_core_web_trf",
+  "dataset_source": "huggingface:orkg/SciQA:test",
+  "ner_useful_hit_rate": "6/10",
+  "noun_chunks_hit_rate": "10/10",
+  "decision": "ner",
+  "items": [
+    {
+      "question": "List the code links in papers that use the A3C-CTS model in any benchmark?",
+      "ner": [
+        {
+          "text": "A3C-CTS",
+          "label": "PRODUCT"
+        }
+      ],
+      "ner_useful": [
+        {
+          "text": "A3C-CTS",
+          "label": "PRODUCT"
+        }
+      ],
+      "noun_chunks": [
+        "the code links",
+        "papers",
+        "that",
+        "the A3C-CTS model",
+        "any benchmark"
+      ],
+      "ner_hit": true,
+      "chunks_hit": true
+    },
+    {
+      "question": "What is the most common lead compound?",
+      "ner": [],
+      "ner_useful": [],
+      "noun_chunks": [
+        "What",
+        "the most common lead compound"
+      ],
+      "ner_hit": false,
+      "chunks_hit": true
+    },
+    {
+      "question": "Indicate the model that performed best in terms of Precision metric on the RotoWire (Relation Generation) benchmark dataset?",
+      "ner": [
+        {
+          "text": "RotoWire",
+          "label": "PRODUCT"
+        }
+      ],
+      "ner_useful": [
+        {
+          "text": "RotoWire",
+          "label": "PRODUCT"
+        }
+      ],
+      "noun_chunks": [
+        "the model",
+        "that",
+        "terms",
+        "Precision metric",
+        "Relation Generation"
+      ],
+      "ner_hit": true,
+      "chunks_hit": true
+    },
+    {
+      "question": "Provide a list of papers that have utilized the Duel hs model and include the links to their code?",
+      "ner": [
+        {
+          "text": "Duel",
+          "label": "PRODUCT"
+        }
+      ],
+      "ner_useful": [
+        {
+          "text": "Duel",
+          "label": "PRODUCT"
+        }
+      ],
+      "noun_chunks": [
+        "a list",
+        "papers",
+        "that",
+        "the Duel hs model",
+        "the links",
+        "their code"
+      ],
+      "ner_hit": true,
+      "chunks_hit": true
+    },
+    {
+      "question": "Provide a list of papers that have utilized the AlexNet, MultiGrasp model and include the links to their code?",
+      "ner": [
+        {
+          "text": "AlexNet",
+          "label": "PRODUCT"
+        },
+        {
+          "text": "MultiGrasp",
+          "label": "PRODUCT"
+        }
+      ],
+      "ner_useful": [
+        {
+          "text": "AlexNet",
+          "label": "PRODUCT"
+        },
+        {
+          "text": "MultiGrasp",
+          "label": "PRODUCT"
+        }
+      ],
+      "noun_chunks": [
+        "a list",
+        "papers",
+        "that",
+        "the AlexNet, MultiGrasp model",
+        "the links",
+        "their code"
+      ],
+      "ner_hit": true,
+      "chunks_hit": true
+    },
+    {
+      "question": "Provide a list of papers that have utilized the SAC model and include the links to their code?",
+      "ner": [],
+      "ner_useful": [],
+      "noun_chunks": [
+        "a list",
+        "papers",
+        "that",
+        "the SAC model",
+        "the links",
+        "their code"
+      ],
+      "ner_hit": false,
+      "chunks_hit": true
+    },
+    {
+      "question": "Could you provide a list of models that have been tested on the IMDb-M benchmark dataset?",
+      "ner": [],
+      "ner_useful": [],
+      "noun_chunks": [
+        "you",
+        "a list",
+        "models",
+        "that",
+        "the IMDb-M benchmark dataset"
+      ],
+      "ner_hit": false,
+      "chunks_hit": true
+    },
+    {
+      "question": "List the metrics that are used to evaluate models on the Story Cloze Test benchmark dataset?",
+      "ner": [],
+      "ner_useful": [],
+      "noun_chunks": [
+        "the metrics",
+        "that",
+        "models",
+        "the Story Cloze Test benchmark dataset"
+      ],
+      "ner_hit": false,
+      "chunks_hit": true
+    },
+    {
+      "question": "What models are being evaluated on the GAD dataset?",
+      "ner": [
+        {
+          "text": "GAD",
+          "label": "ORG"
+        }
+      ],
+      "ner_useful": [
+        {
+          "text": "GAD",
+          "label": "ORG"
+        }
+      ],
+      "noun_chunks": [
+        "What models",
+        "the GAD dataset"
+      ],
+      "ner_hit": true,
+      "chunks_hit": true
+    },
+    {
+      "question": "What are the metrics of evaluation over the OntoNotes dataset?",
+      "ner": [
+        {
+          "text": "OntoNotes",
+          "label": "ORG"
+        }
+      ],
+      "ner_useful": [
+        {
+          "text": "OntoNotes",
+          "label": "ORG"
+        }
+      ],
+      "noun_chunks": [
+        "What",
+        "the metrics",
+        "evaluation",
+        "the OntoNotes dataset"
+      ],
+      "ner_hit": true,
+      "chunks_hit": true
+    }
+  ]
+}

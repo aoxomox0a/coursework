@@ -23,8 +23,13 @@ env/
 # Ignore downloaded/fine-tuned Hugging Face models
 /tf-model/
 
-# Ignore raw PDFs, interim Excel files, and final datasets
-/data/
+# Ignore raw PDFs, interim Excel files, and final datasets — but version
+# the curated gold-evaluation set (reproducibility). The trailing /* is
+# essential: '/data/' on its own would mark the directory itself as ignored,
+# which prevents any re-inclusion of its descendants.
+/data/*
+!/data/gold/
+/data/gold/.cache/
 
 # =========================
 # 3. Vector Database

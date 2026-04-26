@@ -1,8 +1,23 @@
-"""Entity Fetching - Fetch entities and labels from DBpedia."""
+"""Entity Fetching — Fetch entities, properties and classes from a SPARQL endpoint.
+
+Optional kwargs on the fetch functions allow callers (typically the indexing
+pipeline) to inject endpoint-discovered conventions (label predicate, typing,
+language tags). Default values preserve the original DBpedia-targeted behavior.
+"""
+
+import asyncio
+import httpx
 
 from src.indexing.endpoint import query_sparql
 from config.settings import LIMIT_ENTITIES, DEFAULT_MAX_BATCHES
-import asyncio
+
+_DEFAULT_LABEL_PREDICATE = "http://www.w3.org/2000/01/rdf-schema#label"
+_DEFAULT_PROPERTY_TYPE_URI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"
+_DEFAULT_CLASS_TYPE_URI = "http://www.w3.org/2000/01/rdf-schema#Class"
+
+
+def _lang_filter(var: str, require_lang_en: bool) -> str:
+    return f"FILTER (lang(?{var}) = 'en')" if require_lang_en else ""
 
 
 async def get_total_entity_count(sparql_endpoint: str = None) -> int:
@@ -16,7 +31,6 @@ async def get_total_entity_count(sparql_endpoint: str = None) -> int:
         Total count of entities
     """
     from src.indexing.endpoint import query_sparql_custom
-    import httpx
     from config.settings import SPARQL_ENDPOINT
 
     # Try different query approaches to get accurate count
@@ -69,12 +83,18 @@ async def get_total_entity_count(sparql_endpoint: str = None) -> int:
     return 0
 
 
-async def fetch_entities(limit: int = None) -> list:
+async def fetch_entities(
+    limit: int = None,
+    label_predicate: str = _DEFAULT_LABEL_PREDICATE,
+    require_lang_en: bool = True,
+) -> list:
     """
-    Fetch named entities from DBpedia.
+    Fetch named entities from the SPARQL endpoint.
 
     Args:
         limit: Maximum number of entities to fetch (-1 for no limit)
+        label_predicate: Fully-qualified URI of the label predicate to use.
+        require_lang_en: Keep the FILTER(lang(?label)='en') clause when True.
 
     Returns:
         List of dicts with 'uri' and 'label' keys
@@ -84,20 +104,17 @@ async def fetch_entities(limit: int = None) -> list:
 
     limit_clause = "" if limit == -1 else f"LIMIT {limit}"
 
-    # Query to fetch entities with labels (all languages)
     query = f"""
     SELECT ?entity ?label
     WHERE {{
-        ?entity rdfs:label ?label ;
+        ?entity <{label_predicate}> ?label ;
                 rdf:type ?type .
-        FILTER (lang(?label) = 'en')
+        {_lang_filter("label", require_lang_en)}
     }}
     {limit_clause}
     """
 
-    print(
-        f"Fetching entities from DBpedia (limit: {limit if limit != -1 else 'unlimited'})..."
-    )
+    print(f"Fetching entities (limit: {limit if limit != -1 else 'unlimited'})...")
 
     results = await query_sparql(query)
     entities = []
@@ -115,29 +132,53 @@ async def fetch_entities(limit: int = None) -> list:
     return entities
 
 
-async def fetch_properties(limit: int = None) -> list:
+async def fetch_properties(
+    limit: int = None,
+    property_type_uri: str | None = _DEFAULT_PROPERTY_TYPE_URI,
+    label_predicate: str = _DEFAULT_LABEL_PREDICATE,
+    require_lang_en: bool = True,
+) -> list:
     """
     Fetch all properties/predicates from the SPARQL endpoint.
 
     Args:
         limit: Maximum number of properties to fetch (None for no limit)
+        property_type_uri: Fully-qualified URI used to identify properties
+            (e.g. rdf:Property, owl:ObjectProperty). Pass None to discover
+            properties by their use in triples (?s ?property ?o).
+        label_predicate: Label predicate to use for the OPTIONAL label fetch.
+        require_lang_en: Keep the English language filter on labels when True.
 
     Returns:
         List of dicts with 'uri' and 'label' keys
     """
     limit_clause = "" if limit is None else f"LIMIT {limit}"
 
-    query = f"""
-    SELECT DISTINCT ?property ?label
-    WHERE {{
-        ?property a rdf:Property .
-        OPTIONAL {{
-            ?property rdfs:label ?label .
-            FILTER (lang(?label) = 'en')
+    if property_type_uri is None:
+        # Untyped fallback: discover properties from their use in triples.
+        query = f"""
+        SELECT DISTINCT ?property ?label
+        WHERE {{
+            ?s ?property ?o .
+            OPTIONAL {{
+                ?property <{label_predicate}> ?label .
+                {_lang_filter("label", require_lang_en)}
+            }}
         }}
-    }}
-    {limit_clause}
-    """
+        {limit_clause}
+        """
+    else:
+        query = f"""
+        SELECT DISTINCT ?property ?label
+        WHERE {{
+            ?property a <{property_type_uri}> .
+            OPTIONAL {{
+                ?property <{label_predicate}> ?label .
+                {_lang_filter("label", require_lang_en)}
+            }}
+        }}
+        {limit_clause}
+        """
 
     print("Fetching properties/predicates...")
 
@@ -157,29 +198,52 @@ async def fetch_properties(limit: int = None) -> list:
     return properties
 
 
-async def fetch_classes(limit: int = None) -> list:
+async def fetch_classes(
+    limit: int = None,
+    class_type_uri: str | None = _DEFAULT_CLASS_TYPE_URI,
+    label_predicate: str = _DEFAULT_LABEL_PREDICATE,
+    require_lang_en: bool = True,
+) -> list:
     """
     Fetch all classes/types from the SPARQL endpoint.
 
     Args:
         limit: Maximum number of classes to fetch (None for no limit)
+        class_type_uri: Fully-qualified URI used to identify classes
+            (e.g. rdfs:Class, owl:Class). Pass None to discover classes
+            from type assertions (?s a ?class).
+        label_predicate: Label predicate to use for the OPTIONAL label fetch.
+        require_lang_en: Keep the English language filter on labels when True.
 
     Returns:
         List of dicts with 'uri' and 'label' keys
     """
     limit_clause = "" if limit is None else f"LIMIT {limit}"
 
-    query = f"""
-    SELECT DISTINCT ?class ?label
-    WHERE {{
-        ?class a rdfs:Class .
-        OPTIONAL {{ 
-            ?class rdfs:label ?label .
-            FILTER (lang(?label) = 'en')
+    if class_type_uri is None:
+        query = f"""
+        SELECT DISTINCT ?class ?label
+        WHERE {{
+            ?s a ?class .
+            OPTIONAL {{
+                ?class <{label_predicate}> ?label .
+                {_lang_filter("label", require_lang_en)}
+            }}
         }}
-    }}
-    {limit_clause}
-    """
+        {limit_clause}
+        """
+    else:
+        query = f"""
+        SELECT DISTINCT ?class ?label
+        WHERE {{
+            ?class a <{class_type_uri}> .
+            OPTIONAL {{
+                ?class <{label_predicate}> ?label .
+                {_lang_filter("label", require_lang_en)}
+            }}
+        }}
+        {limit_clause}
+        """
 
     print("Fetching classes/types...")
 
@@ -294,46 +358,59 @@ async def fetch_class_entity_mappings(limit: int = None) -> list:
 
 
 async def fetch_entities_batch(
-    batch_size: int = 1000, max_batches: int = DEFAULT_MAX_BATCHES
+    batch_size: int = 1000,
+    max_batches: int = DEFAULT_MAX_BATCHES,
+    label_predicate: str = _DEFAULT_LABEL_PREDICATE,
+    require_lang_en: bool = True,
 ) -> list:
     """
-    Fetch entities in batches with pagination.
+    Fetch entities in parallel batches with pagination.
 
     Args:
         batch_size: Number of entities per batch
         max_batches: Maximum number of batches (-1 for unlimited)
+        label_predicate: Fully-qualified URI of the label predicate.
+        require_lang_en: Keep the English-only FILTER on labels when True.
 
     Returns:
         List of all entities
     """
     all_entities = []
-    offset = 0
-    batch_count = 0
 
-    print(f"\n📦 Fetching entities in batches (batch_size: {batch_size}, max_batches: {max_batches})...\n")
+    print(
+        f"\n📦 Fetching entities in batches (batch_size: {batch_size}, max_batches: {max_batches})...\n"
+    )
+    semaphore = asyncio.Semaphore(10)  # wikidata strict about concurrent requests
 
-    # 1. create list of tasks to run
-    tasks = []
-    for batch_count in range(max_batches):
-        # batch_num = batch_count + 1
-        offset = batch_count * batch_size
-        query = f"""
-        SELECT ?entity ?label
-        WHERE {{
-            ?entity rdfs:label ?label ;
-                    rdf:type ?type .
-                    FILTER (lang(?label) = 'en')
-        }}
-        LIMIT {batch_size}
-        OFFSET {offset}
-        """
-        tasks.append(query_sparql(query))
+    # Wrap the entire batching process in ONE shared connection pool
 
-    # 2. fire all queries at the same time
-    print(f"⏳ Downloading {len(tasks)} batches concurrently...\n")
-    all_results = await asyncio.gather(*tasks)
+    async with httpx.AsyncClient(follow_redirects=True) as shared_client:
 
-    # 3. process returned list and show batch progress
+        async def fetch_with_limit(q: str):
+            async with semaphore:
+                # pass shared client to endpoint logic
+                return await query_sparql(q, client=shared_client)
+
+        tasks = []
+        for batch_count in range(max_batches):
+            offset = batch_count * batch_size
+            query = f"""
+            SELECT ?entity ?label
+            WHERE {{
+                ?entity <{label_predicate}> ?label ;
+                        rdf:type ?type .
+                {_lang_filter("label", require_lang_en)}
+            }}
+            LIMIT {batch_size}
+            OFFSET {offset}
+            """
+            tasks.append(fetch_with_limit(query))
+
+        # 2. fire all queries at the same time
+        print(f"⏳ Downloading {len(tasks)} batches concurrently...\n")
+        all_results = await asyncio.gather(*tasks)
+
+        # 3. process returned list and show batch progress
     for batch_idx, results in enumerate(all_results, 1):
         batch_entities_count = 0
         if (
@@ -349,10 +426,12 @@ async def fetch_entities_batch(
                 if entity["uri"] and entity["label"]:
                     all_entities.append(entity)
                     batch_entities_count += 1
-        
+
         # Show progress per batch
         if batch_entities_count > 0:
-            print(f"  ✓ Batch {batch_idx:3d}: {batch_entities_count:4d} entities (total: {len(all_entities):,})")
+            print(
+                f"  ✓ Batch {batch_idx:3d}: {batch_entities_count:4d} entities (total: {len(all_entities):,})"
+            )
         else:
             print(f"  ✗ Batch {batch_idx:3d}: No entities (fetch completed)")
 

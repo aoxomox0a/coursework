@@ -304,3 +304,46 @@ def query_entities_in_chroma(
     results = collection.query(query_texts=[query_text], n_results=top_k)
 
     return results
+
+
+def query_candidates(
+    query_text: str,
+    collection_name: str,
+    endpoint: str = None,
+    top_k: int = 5,
+) -> list[dict]:
+    """
+    Similarity search against an endpoint-scoped collection, returning formatted
+    {uri, label, score} candidates. Shared helper for entity / relation linking.
+
+    Args:
+        query_text: Text to embed and search with.
+        collection_name: Base collection name (e.g. "entities", "properties").
+        endpoint: Optional SPARQL endpoint URL — selects the endpoint-scoped collection.
+        top_k: Maximum number of candidates to return.
+
+    Returns:
+        List of {"uri", "label", "score"} dicts; empty list if no matches.
+    """
+    client = _get_client()
+    scoped_name = get_collection_name(collection_name, endpoint)
+    collection = client.get_collection(name=scoped_name)
+
+    raw = collection.query(query_texts=[query_text], n_results=top_k)
+
+    if not raw or not raw.get("metadatas") or not raw["metadatas"]:
+        return []
+
+    formatted: list[dict] = []
+    metadatas = raw["metadatas"][0]
+    distances = raw["distances"][0] if raw.get("distances") else [0] * len(metadatas)
+    for metadata, distance in zip(metadatas, distances):
+        similarity = 1 / (1 + distance) if distance > 0 else 1.0
+        formatted.append(
+            {
+                "uri": metadata.get("uri", ""),
+                "label": metadata.get("label", ""),
+                "score": similarity,
+            }
+        )
+    return formatted
