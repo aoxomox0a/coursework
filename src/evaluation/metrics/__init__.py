@@ -6,6 +6,11 @@ The funnel runs in this order; each stage gates the next:
   3. execution_match — generated bindings match gold bindings (set equality, var-name independent)
   4. algebra       — corroborative structural match (Task #3 part 2)
 """
+from src.evaluation.metrics.algebra import (
+    AlgebraMatchResult,
+    AlgebraMatchStatus,
+    evaluate_algebra_match,
+)
 from src.evaluation.metrics.executable import (
     ExecutableResult,
     ExecutableStatus,
@@ -25,4 +30,7 @@ __all__ = [
     "evaluate_executable",
     "ExecutionMatchResult",
     "evaluate_execution_match",
+    "AlgebraMatchResult",
+    "AlgebraMatchStatus",
+    "evaluate_algebra_match",
 ]
