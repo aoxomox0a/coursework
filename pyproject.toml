@@ -19,6 +19,9 @@ dependencies = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "httpx<0.28",
+    "datasets>=2.19.1",
+    "sacrebleu>=2.6.0",
+    "evaluate>=0.4.6",
 ]
 
 [tool.uv.sources]
