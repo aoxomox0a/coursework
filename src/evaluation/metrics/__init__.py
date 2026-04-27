@@ -20,6 +20,11 @@ from src.evaluation.metrics.execution_match import (
     ExecutionMatchResult,
     evaluate_execution_match,
 )
+from src.evaluation.metrics.judge import (
+    JudgeResult,
+    JudgeStatus,
+    evaluate_answer_with_judge,
+)
 from src.evaluation.metrics.self_correction import (
     SelfCorrectionLift,
     compute_self_correction_lift,
@@ -39,4 +44,7 @@ __all__ = [
     "evaluate_algebra_match",
     "SelfCorrectionLift",
     "compute_self_correction_lift",
+    "JudgeResult",
+    "JudgeStatus",
+    "evaluate_answer_with_judge",
 ]
