@@ -84,7 +84,7 @@ async def run_indexing_pipeline(
 
     # Use max_entities parameter if provided, otherwise use config
     entity_limit = max_entities if max_entities is not None else LIMIT_ENTITIES
-    
+
     required_batches = (
         max(1, math.ceil(entity_limit / BATCH_SIZE)) if entity_limit > 0 else None
     )
@@ -167,4 +167,6 @@ async def run_indexing_pipeline(
 
 
 if __name__ == "__main__":
-    asyncio.run(run_indexing_pipeline())
+    from config.settings import SPARQL_ENDPOINT
+
+    asyncio.run(run_indexing_pipeline(custom_endpoint=SPARQL_ENDPOINT))

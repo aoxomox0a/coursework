@@ -17,9 +17,10 @@ def run_api():
 
 
 async def run_index():
+    from config.settings import SPARQL_ENDPOINT
     from src.indexing.pipeline import run_indexing_pipeline
 
-    await run_indexing_pipeline()
+    await run_indexing_pipeline(custom_endpoint=SPARQL_ENDPOINT)
 
 
 def main():
