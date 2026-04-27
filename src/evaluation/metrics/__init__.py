@@ -20,6 +20,10 @@ from src.evaluation.metrics.execution_match import (
     ExecutionMatchResult,
     evaluate_execution_match,
 )
+from src.evaluation.metrics.self_correction import (
+    SelfCorrectionLift,
+    compute_self_correction_lift,
+)
 from src.evaluation.metrics.syntax import SyntaxResult, evaluate_syntax
 
 __all__ = [
@@ -33,4 +37,6 @@ __all__ = [
     "AlgebraMatchResult",
     "AlgebraMatchStatus",
     "evaluate_algebra_match",
+    "SelfCorrectionLift",
+    "compute_self_correction_lift",
 ]
