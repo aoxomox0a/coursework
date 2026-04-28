@@ -25,6 +25,11 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "mistral-7b")
 
+# LLM-as-a-Judge model (evaluation only). Defaults to the generator model
+# when unset — which incurs known self-preference bias (~10-15%) and is
+# documented as such. Set to a different model on Hactar to mitigate.
+JUDGE_LLM_MODEL = os.getenv("JUDGE_LLM_MODEL", LLM_MODEL)
+
 # Validate required LLM settings at import time (fail fast rather than silently)
 if not LLM_API_KEY:
     import warnings

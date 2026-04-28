@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from config.settings import JUDGE_LLM_MODEL
 from src.sparql.llm import call_llm
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ async def evaluate_answer_with_judge(
     """Run the LLM-as-a-Judge over a single (gold, generated) answer pair."""
     base_prompt = _build_prompt(question, gold_answer, generated_answer, sparql_bindings_text)
 
-    raw = await call_llm(base_prompt)
+    raw = await call_llm(base_prompt, model=JUDGE_LLM_MODEL)
     payload = extract_json_from_response(raw)
     if payload is not None:
         result_or_error = _parse_judge_payload(payload)
@@ -150,7 +151,7 @@ async def evaluate_answer_with_judge(
 
     # First pass not parseable — retry once with stricter reminder.
     logger.info("judge: first pass returned non-JSON, retrying")
-    raw_retry = await call_llm(base_prompt + JUDGE_RETRY_REMINDER)
+    raw_retry = await call_llm(base_prompt + JUDGE_RETRY_REMINDER, model=JUDGE_LLM_MODEL)
     payload = extract_json_from_response(raw_retry)
     if payload is not None:
         result_or_error = _parse_judge_payload(payload)

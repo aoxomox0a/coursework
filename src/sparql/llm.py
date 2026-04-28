@@ -22,12 +22,16 @@ http_client = httpx.AsyncClient(
 )
 
 
-async def call_llm(prompt: str) -> str:
+async def call_llm(prompt: str, model: str | None = None) -> str:
     """
     Call Hactar LLM via OpenAI-compatible /chat/completions endpoint.
 
     Args:
         prompt: The prompt to send to the LLM
+        model: Optional model name override. When None, uses LLM_MODEL from
+            settings. Hactar exposes multiple models behind the same endpoint
+            (Ollama-style); passing a different model name routes to it without
+            needing a second client or auth.
 
     Returns:
         Raw generated text from the LLM, or empty string on failure
@@ -37,7 +41,7 @@ async def call_llm(prompt: str) -> str:
         "Content-Type": "application/json",
     }
     payload = {
-        "model": LLM_MODEL,
+        "model": model if model is not None else LLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
         "max_tokens": 512,

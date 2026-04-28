@@ -124,6 +124,32 @@ async def test_judge_includes_question_and_answers_in_prompt(patched_llm):
     assert "Nolan" in prompt
 
 
+async def test_judge_routes_to_judge_llm_model(patched_llm, monkeypatch):
+    """The judge must pass JUDGE_LLM_MODEL to call_llm so users can route to a
+    different model on Hactar (mitigating self-preference bias)."""
+    monkeypatch.setattr("src.evaluation.metrics.judge.JUDGE_LLM_MODEL", "judge-model-xyz")
+    patched_llm.return_value = (
+        '{"factual": 5, "completeness": 5, "fluency": 5, "hallucination": 5, "rationale": "x"}'
+    )
+    await evaluate_answer_with_judge("Q?", "g", "x", "")
+    # call_llm receives model as a keyword argument
+    assert patched_llm.call_args_list[0].kwargs.get("model") == "judge-model-xyz"
+
+
+async def test_judge_routes_retry_to_same_model(patched_llm, monkeypatch):
+    """When the first parse fails and we retry, the retry call must also use
+    JUDGE_LLM_MODEL — not silently fall back to the generator."""
+    monkeypatch.setattr("src.evaluation.metrics.judge.JUDGE_LLM_MODEL", "judge-model-xyz")
+    patched_llm.side_effect = [
+        "not json",
+        '{"factual": 3, "completeness": 3, "fluency": 4, "hallucination": 4, "rationale": "ok"}',
+    ]
+    await evaluate_answer_with_judge("Q?", "g", "x", "")
+    assert patched_llm.call_count == 2
+    assert patched_llm.call_args_list[0].kwargs.get("model") == "judge-model-xyz"
+    assert patched_llm.call_args_list[1].kwargs.get("model") == "judge-model-xyz"
+
+
 # ---------- result invariants --------------------------------------------
 
 
