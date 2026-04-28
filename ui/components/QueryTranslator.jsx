@@ -44,8 +44,6 @@ export default function QueryTranslator() {
     const [sparqlQuery, setSparqlQuery] = useState("");
     const [isTranslating, setIsTranslating] = useState(false);
     const [translationError, setTranslationError] = useState("");
-
-    // const [sparqlInput, setSparqlInput] = useState("");
     const [sparqlInput, setSparqlInput] = useState(`SELECT ?name WHERE {
         ?x rdf:type Person ;
             foaf:name ?name
@@ -411,6 +409,7 @@ export default function QueryTranslator() {
                                 onClick={handleTranslate}
                                 disabled={isTranslating || indexStatus !== "indexed"}
                                 className={`${styles.button} ${styles.translateBtn}`}
+                                title="Press Enter to run."
                             >
                                 {isTranslating ? (
                                     <>
@@ -468,7 +467,7 @@ export default function QueryTranslator() {
                     <div className={styles.card} ref={section3Ref}>
                         <div className={styles.cardHeader}>
                             <h2 className={styles.cardTitle}>SPARQL to Natural Language</h2>
-                            <button onClick={handleExplain} disabled={isExplaining} className={`${styles.button} ${styles.explainBtn}`}>
+                            <button onClick={handleExplain} disabled={isExplaining} className={`${styles.button} ${styles.explainBtn}`} title="Press Ctrl+Enter to run.">
                                 {isExplaining ? (
                                     <>
                                         <span className={styles.skeleton}>⏳</span>
