@@ -27,6 +27,8 @@ class AnswerRequest(BaseModel):
     question: str = Field(
         ..., min_length=1, max_length=1000, description="Natural language question"
     )
+    # tell fastapi to expect an endpoint inside request, otherwise default to SPARQL_ENDPOINT
+    endpoint: str = Field(default=SPARQL_ENDPOINT, description="Target endpoint")
 
 
 class AnswerResponse(BaseModel):
@@ -38,9 +40,7 @@ class AnswerResponse(BaseModel):
 
 
 class ExplainRequest(BaseModel):
-    sparql_query: str = Field(
-        ..., min_length=1, description="SPARQL query to explain"
-    )
+    sparql_query: str = Field(..., min_length=1, description="SPARQL query to explain")
 
 
 class ExplainResponse(BaseModel):
@@ -54,6 +54,8 @@ class GenerateSparqlRequest(BaseModel):
     question: str = Field(
         ..., min_length=1, max_length=1000, description="Natural language question"
     )
+    # tell fastapi to expect an endpoint inside request, otherwise default to SPARQL_ENDPOINT
+    endpoint: str = Field(default=SPARQL_ENDPOINT, description="Target endpoint")
 
 
 class GenerateSparqlResponse(BaseModel):
@@ -97,7 +99,9 @@ async def generate_sparql(request: GenerateSparqlRequest):
         single_linking_result = linking_result[0]
         result = await run_sparql_pipeline(request.question, single_linking_result)
     except Exception as exc:
-        logger.error("SPARQL generation error for question '%s': %s", request.question, exc)
+        logger.error(
+            "SPARQL generation error for question '%s': %s", request.question, exc
+        )
         return JSONResponse(status_code=500, content={"detail": str(exc)})
 
     if result["status"] == "error":
@@ -205,7 +209,9 @@ async def explain_sparql(request: ExplainRequest):
         )
 
     except Exception as exc:
-        logger.error("Question generation error for query '%s': %s", request.sparql_query, exc)
+        logger.error(
+            "Question generation error for query '%s': %s", request.sparql_query, exc
+        )
         return ExplainResponse(
             status="error",
             sparql_query=request.sparql_query,

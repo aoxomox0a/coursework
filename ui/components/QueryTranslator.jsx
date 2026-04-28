@@ -248,6 +248,7 @@ export default function QueryTranslator() {
         try {
             const response = await axios.post("http://localhost:8000/api/generate-sparql", {
                 question: nlQuery,
+                endpoint: endpoint, // pass UI chosen endpoint
             });
 
             if (response.status === 200 && response.data.status === "success") {
