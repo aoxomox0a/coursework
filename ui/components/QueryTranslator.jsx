@@ -45,7 +45,11 @@ export default function QueryTranslator() {
     const [isTranslating, setIsTranslating] = useState(false);
     const [translationError, setTranslationError] = useState("");
 
-    const [sparqlInput, setSparqlInput] = useState("");
+    // const [sparqlInput, setSparqlInput] = useState("");
+    const [sparqlInput, setSparqlInput] = useState(`SELECT ?name WHERE {
+        ?x rdf:type Person ;
+            foaf:name ?name
+        }`);
     const [nlExplanation, setNlExplanation] = useState("");
     const [isExplaining, setIsExplaining] = useState(false);
     const [explanationError, setExplanationError] = useState("");
@@ -54,6 +58,13 @@ export default function QueryTranslator() {
 
     const dropdownRef = useRef(null);
     const audioRef = useRef(null);
+    const section1Ref = useRef(null);
+    const section2Ref = useRef(null);
+    const section3Ref = useRef(null);
+
+    const scrollToSection = (ref) => {
+        ref.current?.scrollIntoView({ behavior: "smooth" });
+    };
 
     // Initialize audio element
     useEffect(() => {
@@ -241,7 +252,7 @@ export default function QueryTranslator() {
                 question: nlQuery,
             });
 
-            if (response.data.status === "success") {
+            if (response.status === 200 && response.data.status === "success") {
                 setSparqlQuery(response.data.sparql_query || "");
                 setTranslationError("");
             } else {
@@ -259,7 +270,9 @@ export default function QueryTranslator() {
 
     // Explain SPARQL to Natural Language
     const handleExplain = async () => {
-        if (!sparqlInput.trim()) {
+        console.log("sparqlInput:", sparqlInput);
+        console.log("type:", typeof sparqlInput);
+        if (!sparqlInput?.trim()) {
             alert("Please enter a SPARQL query");
             return;
         }
@@ -290,31 +303,41 @@ export default function QueryTranslator() {
     };
 
     return (
-        <div className={styles.container}>
-            {/* Music Player Button */}
-            <button
-                onClick={handleMusicToggle}
-                className={`${styles.musicButton} ${isPlayingMusic ? styles.playing : ""}`}
-                title={isPlayingMusic ? "Stop music" : "Play ambient music"}
-                aria-label="Toggle ambient music"
-            >
-                {isPlayingMusic ? "🎵" : "🎵"}
-            </button>
-
-            <h1 className={styles.title}>Natural Language ⇌ SPARQL</h1>
-
-            <div className={styles.mainWrapper}>
-                {/* ===== CARD 1: SELECT ENDPOINT & INDEX ===== */}
-                <div className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div className={styles.cardStep}>1</div>
-                        <h2 className={styles.cardTitle}>Select Endpoint & Index</h2>
+        <>
+            <div className={styles.navBar}>
+                <div className={styles.navContent}>
+                    <div className={styles.navMenu}>
+                        <button className={styles.navButton} onClick={() => scrollToSection(section1Ref)}>
+                            Indexing
+                        </button>
+                        <button className={styles.navButton} onClick={() => scrollToSection(section2Ref)}>
+                            NL → SPARQL
+                        </button>
+                        <button className={styles.navButton} onClick={() => scrollToSection(section3Ref)}>
+                            SPARQL → NL
+                        </button>
                     </div>
+                </div>
+            </div>
+            <div className={styles.container}>
+                <button
+                    onClick={handleMusicToggle}
+                    className={`${styles.musicButton} ${isPlayingMusic ? styles.playing : ""}`}
+                    title={isPlayingMusic ? "Stop music" : "Play ambient music"}
+                    aria-label="Toggle ambient music"
+                >
+                    {isPlayingMusic ? "🎵" : "🎵"}
+                </button>
 
+                <div className={styles.endpointcard} ref={section1Ref}>
+                    <h1 className={styles.title}>Natural Language </h1>
+                    <h1 className={styles.title} style={{ fontFamily: "Courier New, Consolas, Monaco, monospace" }}>
+                        SPARQL
+                    </h1>
+                    <h1 className={styles.title}>conversion</h1>
                     <div className={styles.section}>
-                        {/* Endpoint Input Row */}
-                        <div style={{ marginBottom: "16px" }}>
-                            <label className={styles.label}>SPARQL Endpoint URL</label>
+                        <label className={styles.label}>SPARQL Endpoint URL</label>
+                        <div className={styles.indexLineContainer}>
                             <div className={styles.comboboxContainer} ref={dropdownRef}>
                                 <input
                                     type="text"
@@ -347,30 +370,6 @@ export default function QueryTranslator() {
                                     </div>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Index & Entities Row */}
-                        <div className={styles.indexLineContainer}>
-                            {/* Index Button with Tooltip */}
-                            <button
-                                onClick={handleIndexLink}
-                                disabled={isIndexing || indexStatus === "indexed"}
-                                className={`${styles.button} ${styles.indexBtn}`}
-                                data-status={indexMessage}
-                                title={indexMessage}
-                            >
-                                {isIndexing ? (
-                                    <>
-                                        <span className={styles.skeleton}>⏳</span> Indexing...
-                                    </>
-                                ) : indexStatus === "indexed" ? (
-                                    "✓ Indexed"
-                                ) : (
-                                    "📊 Index & Link"
-                                )}
-                            </button>
-
-                            {/* Entities Limit Input */}
                             <div className={styles.entityLimitContainer}>
                                 <label className={styles.label}>Entities Limit</label>
                                 <input
@@ -383,160 +382,148 @@ export default function QueryTranslator() {
                                     min="1"
                                 />
                             </div>
+                            <button
+                                onClick={handleIndexLink}
+                                disabled={isIndexing || indexStatus === "indexed"}
+                                className={`${styles.button} ${styles.indexBtn}`}
+                                data-status={indexMessage}
+                                title={indexMessage}
+                            >
+                                {isIndexing ? (
+                                    <>
+                                        <span className={styles.skeleton}>⏳</span> Indexing...
+                                    </>
+                                ) : indexStatus === "indexed" ? (
+                                    "Indexed"
+                                ) : (
+                                    "Index and Link"
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/* ===== CARD 2: NL TO SPARQL ===== */}
-                <div className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div className={styles.cardStep}>2</div>
-                        <h2 className={styles.cardTitle}>Natural Language to SPARQL</h2>
-                    </div>
-
-                    <div className={styles.section}>
-                        <div className={styles.translationContainer}>
-                            {/* LEFT: Natural Language Input */}
-                            <div className={styles.inputColumn}>
-                                <label className={styles.label}>Natural Language Question</label>
-                                <textarea
-                                    value={nlQuery}
-                                    onChange={(e) => setNlQuery(e.target.value)}
-                                    placeholder="e.g., Who directed Inception?"
-                                    className={styles.textarea}
-                                    disabled={isTranslating || indexStatus !== "indexed"}
-                                />
-                            </div>
-
-                            {/* MIDDLE: Translate Button */}
-                            <div className={styles.buttonColumn}>
-                                <button
-                                    onClick={handleTranslate}
-                                    disabled={isTranslating || indexStatus !== "indexed"}
-                                    className={`${styles.button} ${styles.translateBtn}`}
-                                >
-                                    {isTranslating ? (
-                                        <>
-                                            <span className={styles.skeleton}>⏳</span>
-                                            <br />
-                                            Translate
-                                        </>
-                                    ) : (
-                                        <>
-                                            📖
-                                            <br />
-                                            Translate
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* RIGHT: SPARQL Output */}
-                            {/* <div className={styles.outputColumn}>
-                                <label className={styles.label}>SPARQL Query Output</label>
-                                <textarea
-                                    value={sparqlQuery}
-                                    readOnly
-                                    placeholder="SPARQL query will appear here..."
-                                    className={`${styles.textarea} ${styles.outputTextarea}`}
-                                />
-                            </div> */}
-                            <div className={styles.monacoContainer, styles.outputColumn}>
-                                <label className={styles.label}>SPARQL Query Output</label>
-                                <Editor
-                                    height="100%"
-                                    className={`${styles.textarea} ${styles.outputTextarea}`}
-                                    defaultLanguage="sparql"
-                                    value={sparqlQuery}
-                                    options={{
-                                        readOnly: true,
-                                        minimap: { enabled: false },
-                                        wordWrap: "on",
-                                        fontSize: 13,
-                                        placeholder: "SPARQL query will appear here...",
-                                    }}
-                                    theme="vs-light"
-                                />
-                            </div>
+                <div className={styles.mainWrapper}>
+                    <div className={styles.card} ref={section2Ref}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>Natural Language to SPARQL</h2>
+                            <button
+                                onClick={handleTranslate}
+                                disabled={isTranslating || indexStatus !== "indexed"}
+                                className={`${styles.button} ${styles.translateBtn}`}
+                            >
+                                {isTranslating ? (
+                                    <>
+                                        <span className={styles.skeleton}>⏳</span>
+                                        Running
+                                    </>
+                                ) : (
+                                    <>Run</>
+                                )}
+                            </button>
                         </div>
 
-                        {translationError && <div className={styles.error}>✗ {translationError}</div>}
-                    </div>
-                </div>
-
-                {/* ===== CARD 3: SPARQL TO NL ===== */}
-                <div className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <div className={styles.cardStep}>3</div>
-                        <h2 className={styles.cardTitle}>SPARQL to Natural Language</h2>
-                    </div>
-
-                    <div className={styles.section}>
-                        <div className={styles.translationContainer}>
-                            {/* LEFT: SPARQL Input */}
-                            {/* <div className={styles.inputColumn}>
-                                <label className={styles.label}>SPARQL Query Input</label>
-                                <textarea
-                                    value={sparqlInput}
-                                    onChange={(e) => setSparqlInput(e.target.value)}
-                                    placeholder="e.g., SELECT ?name WHERE { ?x rdf:type Person; foaf:name ?name }"
-                                    className={styles.textarea}
-                                    disabled={isExplaining}
-                                />
-                            </div> */}
-
-                                 <div className={styles.monacoContainer, styles.inputColumn}>
-                                      <label className={styles.label}>SPARQL Query Input</label>
-                                      <Editor
-                                        defaultLanguage="sparql"
+                        <div className={styles.section}>
+                            <div className={styles.translationContainer}>
+                                {/* LEFT: Natural Language Input */}
+                                <div className={styles.inputColumn}>
+                                    <label className={styles.label}>Natural Language Question</label>
+                                    <textarea
+                                        value={nlQuery}
+                                        onChange={(e) => setNlQuery(e.target.value)}
+                                        placeholder="e.g., Who directed Inception?"
                                         className={styles.textarea}
-                                        value={sparqlInput}
-                                        onChange={(e) =>  setSparqlInput(e.target.value)}
+                                        disabled={isTranslating || indexStatus !== "indexed"}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleTranslate();
+                                            }
+                                        }}
+                                    />
+                                </div>
+
+                                <div className={`${styles.monacoContainer} ${styles.outputColumn}`}>
+                                    <label className={styles.label}>SPARQL Query Output</label>
+                                    <Editor
+                                        height="100%"
+                                        className={`${styles.textarea} ${styles.outputTextarea}`}
+                                        defaultLanguage="sparql"
+                                        value={sparqlQuery}
                                         options={{
+                                            readOnly: true,
                                             minimap: { enabled: false },
                                             wordWrap: "on",
                                             fontSize: 13,
-                                            placeholder: "SELECT ?name WHERE { \n?x rdf:type Person; \nfoaf:name ?name \n}",
+                                            placeholder: "SPARQL query will appear here...",
                                         }}
                                         theme="vs-light"
                                     />
                                 </div>
-
-                            {/* MIDDLE: Explain Button */}
-                            <div className={styles.buttonColumn}>
-                                <button onClick={handleExplain} disabled={isExplaining} className={`${styles.button} ${styles.explainBtn}`}>
-                                    {isExplaining ? (
-                                        <>
-                                            <span className={styles.skeleton}>⏳</span>
-                                            <br />
-                                            Translate
-                                        </>
-                                    ) : (
-                                        <>
-                                            📖
-                                            <br />
-                                            Translate
-                                        </>
-                                    )}
-                                </button>
                             </div>
 
-                            {/* RIGHT: Natural Language Output */}
-                            <div className={styles.outputColumn}>
-                                <label className={styles.label}>Natural Language Explanation</label>
-                                <textarea
-                                    value={nlExplanation}
-                                    readOnly
-                                    placeholder="Explanation will appear here..."
-                                    className={`${styles.textarea} ${styles.outputTextarea}`}
-                                />
-                            </div>
+                            {translationError && <div className={styles.error}>✗ {translationError}</div>}
+                        </div>
+                    </div>
+                    <div className={styles.card} ref={section3Ref}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>SPARQL to Natural Language</h2>
+                            <button onClick={handleExplain} disabled={isExplaining} className={`${styles.button} ${styles.explainBtn}`}>
+                                {isExplaining ? (
+                                    <>
+                                        <span className={styles.skeleton}>⏳</span>
+                                        Running
+                                    </>
+                                ) : (
+                                    <>Run</>
+                                )}
+                            </button>
                         </div>
 
-                        {explanationError && <div className={styles.error}>✗ {explanationError}</div>}
+                        <div className={styles.section}>
+                            <div className={styles.translationContainer}>
+                                <div className={`${styles.monacoContainer} ${styles.inputColumn}`}>
+                                    <label className={styles.label}>SPARQL Query Input</label>
+                                    <Editor
+                                        defaultLanguage="sparql"
+                                        defaultValue={`SELECT ?name WHERE {
+                                            ?x rdf:type Person ;
+                                                foaf:name ?name
+                                            }`}
+                                        className={styles.textarea}
+                                        value={sparqlInput}
+                                        onChange={(value) => setSparqlInput(value || "")}
+                                        options={{
+                                            minimap: { enabled: false },
+                                            wordWrap: "on",
+                                            fontSize: 13,
+                                        }}
+                                        theme="vs-light"
+                                        onMount={(editor, monaco) => {
+                                            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                                                handleExplain();
+                                            });
+                                        }}
+                                    />
+                                </div>
+
+                                {/* RIGHT: Natural Language Output */}
+                                <div className={styles.outputColumn}>
+                                    <label className={styles.label}>Natural Language Explanation</label>
+                                    <textarea
+                                        value={nlExplanation}
+                                        readOnly
+                                        placeholder="Explanation will appear here..."
+                                        className={`${styles.textarea} ${styles.outputTextarea}`}
+                                    />
+                                </div>
+                            </div>
+
+                            {explanationError && <div className={styles.error}>✗ {explanationError}</div>}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
