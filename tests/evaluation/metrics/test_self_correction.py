@@ -19,6 +19,7 @@ def _trace(*, first_valid: bool, used_retry: bool, retry_valid: bool | None) -> 
         retry_error="" if (retry_valid is None or retry_valid) else "still bad",
         final_query="q2" if (used_retry and retry_valid) else "q1",
         final_valid=final_valid,
+        bindings=[] if final_valid else None,
         answer="a" if final_valid else "",
         status="success" if final_valid else "error",
     )

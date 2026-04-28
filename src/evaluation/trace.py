@@ -11,7 +11,7 @@ pipeline changes shape (e.g. adds a second retry), keep this module in sync.
 import logging
 from dataclasses import dataclass
 
-from src.sparql.execution import execute_and_format
+from src.sparql.execution import execute_query, format_results
 from src.sparql.llm import call_llm, extract_sparql_from_response
 from src.sparql.prompt import generate_fix_sparql_prompt, generate_sparql_prompt
 from src.sparql.validation import is_valid_sparql
@@ -31,8 +31,9 @@ class PipelineTrace:
     retry_error: str | None
     final_query: str
     final_valid: bool
-    answer: str
-    status: str  # "success" | "error"
+    bindings: list[dict] | None       # raw SPARQL bindings (None if not executed)
+    answer: str                        # formatted answer text
+    status: str                        # "success" | "error"
 
 
 def _short_circuit(question: str, reason: str) -> PipelineTrace:
@@ -47,6 +48,7 @@ def _short_circuit(question: str, reason: str) -> PipelineTrace:
         retry_error=None,
         final_query="",
         final_valid=False,
+        bindings=None,
         answer="",
         status="error",
     )
@@ -128,11 +130,14 @@ async def run_with_trace(question: str, linking_result: dict) -> PipelineTrace:
             retry_error=retry_error,
             final_query=final_query,
             final_valid=False,
+            bindings=None,
             answer="",
             status="error",
         )
 
-    answer = await execute_and_format(final_query)
+    response = await execute_query(final_query)
+    bindings = response.get("results", {}).get("bindings", []) if "error" not in response else None
+    answer = format_results(response)
     return PipelineTrace(
         question=question,
         first_pass_query=first_query,
@@ -144,6 +149,7 @@ async def run_with_trace(question: str, linking_result: dict) -> PipelineTrace:
         retry_error=retry_error,
         final_query=final_query,
         final_valid=True,
+        bindings=bindings,
         answer=answer,
         status="success",
     )

@@ -25,8 +25,12 @@ def patched_pipeline(monkeypatch):
         lambda raw: raw,
     )
     monkeypatch.setattr(
-        "src.evaluation.trace.execute_and_format",
-        AsyncMock(return_value="formatted answer"),
+        "src.evaluation.trace.execute_query",
+        AsyncMock(return_value={"results": {"bindings": [{"x": {"type": "uri", "value": "http://a"}}]}}),
+    )
+    monkeypatch.setattr(
+        "src.evaluation.trace.format_results",
+        lambda response: "formatted answer",
     )
     return llm_mock
 
@@ -44,6 +48,9 @@ async def test_first_pass_valid_no_retry(patched_pipeline, linking_result):
     assert trace.final_query == "SELECT ?x WHERE { ?x ?p ?o }"
     assert trace.final_valid is True
     assert trace.status == "success"
+    # Raw bindings captured alongside formatted answer for downstream metrics.
+    assert trace.bindings == [{"x": {"type": "uri", "value": "http://a"}}]
+    assert trace.answer == "formatted answer"
 
 
 # ---------- recovery: first pass invalid, retry valid ---------------------
