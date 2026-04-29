@@ -33,7 +33,7 @@ const getRandomMusicUrl = () => {
 };
 
 export default function QueryTranslator() {
-    const [endpoint, setEndpoint] = useState("http://dbpedia.org/sparql");
+    const [currentEndpoint, setCurrentEndpoint] = useState("http://dbpedia.org/sparql");
     const [isIndexing, setIsIndexing] = useState(false);
     const [indexStatus, setIndexStatus] = useState("unknown");
     const [indexMessage, setIndexMessage] = useState("");
@@ -52,17 +52,15 @@ export default function QueryTranslator() {
     const [isExplaining, setIsExplaining] = useState(false);
     const [explanationError, setExplanationError] = useState("");
 
+    const [nlInput, setNlInput] = useState("");
+    const [nlAnswer, setNlAnswer] = useState("");
+    const [isAnswering, setIsAnswering] = useState(false);
+    const [answerError, setAnswerError] = useState("");
+
     const [isPlayingMusic, setIsPlayingMusic] = useState(false);
 
     const dropdownRef = useRef(null);
     const audioRef = useRef(null);
-    const section1Ref = useRef(null);
-    const section2Ref = useRef(null);
-    const section3Ref = useRef(null);
-
-    const scrollToSection = (ref) => {
-        ref.current?.scrollIntoView({ behavior: "smooth" });
-    };
 
     // Initialize audio element
     useEffect(() => {
@@ -72,6 +70,15 @@ export default function QueryTranslator() {
             audio.volume = 0.3; // Set volume to 30%
             audioRef.current = audio;
         }
+    }, []);
+
+    // Cleanup: stop music when component unmounts
+    useEffect(() => {
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+        };
     }, []);
 
     // Close dropdown when clicking outside
@@ -109,15 +116,6 @@ export default function QueryTranslator() {
         }
     };
 
-    // Cleanup: stop music when component unmounts
-    useEffect(() => {
-        return () => {
-            if (audioRef.current) {
-                audioRef.current.pause();
-            }
-        };
-    }, []);
-
     // Check if endpoint is indexed
     const checkIndexStatus = async (url) => {
         try {
@@ -140,24 +138,9 @@ export default function QueryTranslator() {
         }
     };
 
-    // Handle endpoint selection from dropdown
-    const handleEndpointSelect = (value) => {
-        setEndpoint(value);
-        checkIndexStatus(value);
-    };
-
-    // Handle manual endpoint input
-    const handleEndpointChange = (e) => {
-        const value = e.target.value;
-        setEndpoint(value);
-        if (value.trim()) {
-            checkIndexStatus(value);
-        }
-    };
-
     // Index & Link button - now with SSE streaming
     const handleIndexLink = async () => {
-        if (!endpoint.trim()) {
+        if (!currentEndpoint.trim()) {
             alert("Please enter a SPARQL endpoint URL");
             return;
         }
@@ -167,18 +150,17 @@ export default function QueryTranslator() {
         setIndexStatus("indexing");
 
         try {
-            const indexPayload = { endpoint: endpoint };
+            const indexPayload = { endpoint: currentEndpoint };
             if (entityLimit) {
                 indexPayload.max_entities = parseInt(entityLimit);
             }
-
             await axios.post("http://localhost:8000/api/index", indexPayload);
 
             // Stream status updates via SSE
-            const eventSource = new EventSource(`http://localhost:8000/api/status/stream?endpoint=${encodeURIComponent(endpoint)}`);
+            const eventSource = new EventSource(`http://localhost:8000/api/status/stream?endpoint=${encodeURIComponent(currentEndpoint)}`);
             let sseTimeout;
 
-            console.log(`🔌 [SSE] Connected to stream for ${endpoint}`);
+            console.log(`🔌 [SSE] Connected to stream for ${currentEndpoint}`);
 
             // Fallback: If SSE takes too long (10 minutes), assume complete
             sseTimeout = setTimeout(
@@ -248,7 +230,7 @@ export default function QueryTranslator() {
         try {
             const response = await axios.post("http://localhost:8000/api/generate-sparql", {
                 question: nlQuery,
-                endpoint: endpoint, // pass UI chosen endpoint
+                endpoint: currentEndpoint,
             });
 
             if (response.status === 200 && response.data.status === "success") {
@@ -269,8 +251,6 @@ export default function QueryTranslator() {
 
     // Explain SPARQL to Natural Language
     const handleExplain = async () => {
-        console.log("sparqlInput:", sparqlInput);
-        console.log("type:", typeof sparqlInput);
         if (!sparqlInput?.trim()) {
             alert("Please enter a SPARQL query");
             return;
@@ -301,23 +281,35 @@ export default function QueryTranslator() {
         }
     };
 
+    const handleAnswer = async () => {
+        setIsAnswering(true);
+        setAnswerError("");
+        setNlAnswer("");
+
+        try {
+            const response = await axios.post("http://localhost:8000/api/answer", {
+                question: nlInput,
+                endpoint: currentEndpoint,
+            });
+
+            if (response.data.status === "success") {
+                setNlAnswer(response.data.message || "");
+                setAnswerError("");
+            } else {
+                setAnswerError(response.data.error || "Answer failed");
+                setNlAnswer("");
+            }
+        } catch (error) {
+            setAnswerError(error.response?.data?.message || error.message || "Answer error");
+            setNlAnswer("");
+            console.error("Answer error:", error);
+        } finally {
+            setIsAnswering(false);
+        }
+    };
+
     return (
         <>
-            <div className={styles.navBar}>
-                <div className={styles.navContent}>
-                    <div className={styles.navMenu}>
-                        <button className={styles.navButton} onClick={() => scrollToSection(section1Ref)}>
-                            Indexing
-                        </button>
-                        <button className={styles.navButton} onClick={() => scrollToSection(section2Ref)}>
-                            NL → SPARQL
-                        </button>
-                        <button className={styles.navButton} onClick={() => scrollToSection(section3Ref)}>
-                            SPARQL → NL
-                        </button>
-                    </div>
-                </div>
-            </div>
             <div className={styles.container}>
                 <button
                     onClick={handleMusicToggle}
@@ -327,83 +319,131 @@ export default function QueryTranslator() {
                 >
                     {isPlayingMusic ? "🎵" : "🎵"}
                 </button>
+                <div className={styles.header}>
+                    <div className={styles.endpointcard}>
+                        <div>
+                            <h1 className={styles.title}>Natural Language </h1>
+                            <h1 className={styles.title} style={{ fontFamily: "Courier New, Consolas, Monaco, monospace" }}>
+                                SPARQL
+                            </h1>
+                            <h1 className={styles.title}>conversion</h1>
+                        </div>
+                        <div className={styles.section}>
+                            <div className={styles.indexLineContainer}>
+                                <div className={styles.comboboxContainer} ref={dropdownRef}>
+                                    <label className={styles.label}>SPARQL Endpoint URL</label>
+                                    <input
+                                        type="text"
+                                        value={currentEndpoint}
+                                        onChange={(e) => {
+                                            setCurrentEndpoint(e.target.value);
+                                            checkIndexStatus(e.target.value);
+                                        }}
+                                        onFocus={() => setShowDropdown(true)}
+                                        placeholder="http://your-sparql-endpoint/sparql"
+                                        className={styles.comboboxInput}
+                                        disabled={isIndexing}
+                                    />
 
-                <div className={styles.endpointcard} ref={section1Ref}>
-                    <h1 className={styles.title}>Natural Language </h1>
-                    <h1 className={styles.title} style={{ fontFamily: "Courier New, Consolas, Monaco, monospace" }}>
-                        SPARQL
-                    </h1>
-                    <h1 className={styles.title}>conversion</h1>
-                    <div className={styles.section}>
-                        <label className={styles.label}>SPARQL Endpoint URL</label>
-                        <div className={styles.indexLineContainer}>
-                            <div className={styles.comboboxContainer} ref={dropdownRef}>
-                                <input
-                                    type="text"
-                                    value={endpoint}
-                                    onChange={(e) => {
-                                        setEndpoint(e.target.value);
-                                        checkIndexStatus(e.target.value);
-                                    }}
-                                    onFocus={() => setShowDropdown(true)}
-                                    placeholder="http://your-sparql-endpoint/sparql"
-                                    className={styles.comboboxInput}
-                                    disabled={isIndexing}
-                                />
-
-                                {showDropdown && (
-                                    <div className={styles.dropdownList}>
-                                        {PREDEFINED_QUERIES.map((query) => (
-                                            <div
-                                                key={query.value}
-                                                className={`${styles.dropdownItem} ${endpoint === query.value ? styles.active : ""}`}
-                                                onClick={() => {
-                                                    setEndpoint(query.value);
-                                                    checkIndexStatus(query.value);
-                                                    setShowDropdown(false);
-                                                }}
-                                            >
-                                                {query.label}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <div className={styles.entityLimitContainer}>
-                                <label className={styles.label}>Entities Limit</label>
-                                <input
-                                    type="number"
-                                    value={entityLimit}
-                                    onChange={(e) => setEntityLimit(e.target.value)}
-                                    placeholder="10000"
-                                    className={styles.entityLimitInput}
+                                    {showDropdown && (
+                                        <div className={styles.dropdownList}>
+                                            {PREDEFINED_QUERIES.map((query) => (
+                                                <div
+                                                    key={query.value}
+                                                    className={`${styles.dropdownItem} ${currentEndpoint === query.value ? styles.active : ""}`}
+                                                    onClick={() => {
+                                                        setCurrentEndpoint(query.value);
+                                                        checkIndexStatus(query.value);
+                                                        setShowDropdown(false);
+                                                    }}
+                                                >
+                                                    {query.label}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className={styles.entityLimitContainer}>
+                                    <label className={styles.label}>Entities Limit</label>
+                                    <input
+                                        type="number"
+                                        value={entityLimit}
+                                        onChange={(e) => setEntityLimit(e.target.value)}
+                                        placeholder="10000"
+                                        className={styles.entityLimitInput}
+                                        disabled={isIndexing || indexStatus === "indexed"}
+                                        min="1"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleIndexLink}
                                     disabled={isIndexing || indexStatus === "indexed"}
-                                    min="1"
-                                />
+                                    className={`${styles.button} ${styles.indexBtn}`}
+                                    data-status={indexMessage}
+                                    title={indexMessage}
+                                >
+                                    {isIndexing ? (
+                                        <>
+                                            <span className={styles.skeleton}>⏳</span> Indexing...
+                                        </>
+                                    ) : indexStatus === "indexed" ? (
+                                        "Indexed"
+                                    ) : (
+                                        "Index"
+                                    )}
+                                </button>
                             </div>
-                            <button
-                                onClick={handleIndexLink}
-                                disabled={isIndexing || indexStatus === "indexed"}
-                                className={`${styles.button} ${styles.indexBtn}`}
-                                data-status={indexMessage}
-                                title={indexMessage}
-                            >
-                                {isIndexing ? (
-                                    <>
-                                        <span className={styles.skeleton}>⏳</span> Indexing...
-                                    </>
-                                ) : indexStatus === "indexed" ? (
-                                    "Indexed"
-                                ) : (
-                                    "Index and Link"
-                                )}
-                            </button>
                         </div>
                     </div>
                 </div>
+                <div className={styles.chatboxsection}>
+                    <div className={styles.chatbox}>
+                        <div className={styles.questionCard}>
+                            <div className={styles.chatheader}>Natural Language Question</div>
+                            <div className={styles.chatText}>
+                                <textarea
+                                    onChange={(e) => setNlInput(e.target.value)}
+                                    placeholder="e.g., Who directed Inception?"
+                                    className={styles.textarea}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAnswer();
+                                        }
+                                    }}
+                                    disabled={isAnswering || indexStatus !== "indexed"}
+                                />
+                            </div>
+                        </div>
+                        <button className={styles.sendBtn} onClick={() => handleAnswer()} disabled={isAnswering || indexStatus !== "indexed"}>
+                            {isAnswering ? (
+                                <>
+                                    <span className={styles.skeleton}>⏳</span>
+                                    Answering
+                                </>
+                            ) : (
+                                <>SEND</>
+                            )}
+                        </button>
 
+                        <div className={styles.responseCard}>
+                            <div className={styles.chatheader}>Natural Language Answer</div>
+                            <div className={styles.chatText}>
+                                {nlAnswer === "" ? (
+                                    answerError === "" ? (
+                                        <p>"Answer will appear here..." </p>
+                                    ) : (
+                                        <p className={styles.error}>✗ {answerError}</p>
+                                    )
+                                ) : (
+                                    nlAnswer
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div className={styles.mainWrapper}>
-                    <div className={styles.card} ref={section2Ref}>
+                    <div className={styles.card}>
                         <div className={styles.cardHeader}>
                             <h2 className={styles.cardTitle}>Natural Language to SPARQL</h2>
                             <button
@@ -425,7 +465,6 @@ export default function QueryTranslator() {
 
                         <div className={styles.section}>
                             <div className={styles.translationContainer}>
-                                {/* LEFT: Natural Language Input */}
                                 <div className={styles.inputColumn}>
                                     <label className={styles.label}>Natural Language Question</label>
                                     <textarea
@@ -465,10 +504,15 @@ export default function QueryTranslator() {
                             {translationError && <div className={styles.error}>✗ {translationError}</div>}
                         </div>
                     </div>
-                    <div className={styles.card} ref={section3Ref}>
+                    <div className={styles.card}>
                         <div className={styles.cardHeader}>
                             <h2 className={styles.cardTitle}>SPARQL to Natural Language</h2>
-                            <button onClick={handleExplain} disabled={isExplaining} className={`${styles.button} ${styles.explainBtn}`} title="Press Ctrl+Enter to run.">
+                            <button
+                                onClick={handleExplain}
+                                disabled={isExplaining}
+                                className={`${styles.button} ${styles.explainBtn}`}
+                                title="Press Ctrl+Enter to run."
+                            >
                                 {isExplaining ? (
                                     <>
                                         <span className={styles.skeleton}>⏳</span>
