@@ -119,6 +119,43 @@ def test_both_invalid_returns_gold_error_first():
     assert r.status == AlgebraMatchStatus.GOLD_PARSE_ERROR
 
 
+# ---------- SciQA-style undeclared prefixes ------------------------------
+
+
+def test_gold_with_undeclared_orkg_prefixes_parses():
+    """SciQA gold queries reference orkgc/orkgp/rdfs without declaring them —
+    the ORKG SciQA endpoint injects defaults server-side. The local parser
+    must resolve them via initNs, not raise GOLD_PARSE_ERROR."""
+    gold = """SELECT ?model WHERE {
+        ?dataset a orkgc:Dataset ; rdfs:label "FTD" .
+        ?benchmark orkgp:HAS_DATASET ?dataset .
+        ?benchmark orkgp:HAS_MODEL ?model .
+    }"""
+    # Same query, expanded to absolute URIs.
+    gen = """SELECT ?m WHERE {
+        ?d a <http://orkg.org/orkg/class/Dataset> ;
+           <http://www.w3.org/2000/01/rdf-schema#label> "FTD" .
+        ?b <http://orkg.org/orkg/predicate/HAS_DATASET> ?d .
+        ?b <http://orkg.org/orkg/predicate/HAS_MODEL> ?m .
+    }"""
+    r = evaluate_algebra_match(gold, gen)
+    assert r.status == AlgebraMatchStatus.COMPARED
+    assert r.match is True
+
+
+def test_generated_with_own_prefix_block_still_parses():
+    """A generated query that declares its own PREFIX block must still parse
+    cleanly — its declarations should not collide with the initNs defaults."""
+    gold = "SELECT ?x WHERE { ?x rdfs:label \"x\" }"
+    gen = (
+        "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"
+        "SELECT ?y WHERE { ?y rdfs:label \"x\" }"
+    )
+    r = evaluate_algebra_match(gold, gen)
+    assert r.status == AlgebraMatchStatus.COMPARED
+    assert r.match is True
+
+
 # ---------- HARD FEATURES handled without crashing -----------------------
 
 

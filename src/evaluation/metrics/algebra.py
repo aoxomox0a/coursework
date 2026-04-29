@@ -113,12 +113,27 @@ def _canonicalise(node: Any, var_map: dict) -> Any:
     return ("Raw", str(node))
 
 
+# SciQA gold queries reference these aliases without declaring them — the
+# ORKG SciQA endpoint injects defaults server-side. We feed them to
+# prepareQuery via initNs so local parsing matches the server's behaviour
+# without rewriting the gold strings. A query that declares its own PREFIX
+# block overrides these (rdflib gives the inline declaration precedence).
+_DEFAULT_PREFIXES = {
+    "orkgr": "http://orkg.org/orkg/resource/",
+    "orkgp": "http://orkg.org/orkg/predicate/",
+    "orkgc": "http://orkg.org/orkg/class/",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+}
+
+
 def _normalize_query(query: str) -> Any:
     """Parse + extract algebra + canonicalise. Each call gets a fresh var_map
     so two queries are renumbered independently, which is the desired behaviour
     for cross-query comparison (each side gets ?v0, ?v1, … in its own walk order).
     """
-    algebra = prepareQuery(query).algebra
+    algebra = prepareQuery(query, initNs=_DEFAULT_PREFIXES).algebra
     var_map: dict = {}
     return _canonicalise(algebra, var_map)
 
