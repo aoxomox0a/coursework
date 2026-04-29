@@ -39,11 +39,11 @@ async def execute_sparql_async(query, endpoint="https://dbpedia.org/sparql"):
             # we extract the 'bindings' list specifically for comparison
             return response.json().get("results", {}).get("bindings", [])
 
-        print(f"⚠️ DBpedia returned {response.status_code} for query")
+        print(f"DBpedia returned {response.status_code} for query")
         return None
 
     except Exception as e:
-        print(f"⚠️ DBpedia Connection Error: {e}")
+        print(f"DBpedia Connection Error: {e}")
         return None
 
 
@@ -64,7 +64,7 @@ async def process_single_question(item, semaphore, index):
         question = item["question"]
         true_sparql = item["sparql_dbpedia18"]
 
-        print(f"🔄 Starting Query {index}: {question[:50]}...")
+        print(f"Starting Query {index}: {question[:50]}...")
 
         # entity and relation link
         linking_results_list = run_linking_pipeline(question)
@@ -87,7 +87,7 @@ async def process_single_question(item, semaphore, index):
             predicted_data = await execute_sparql_async(predicted_sparql)
             is_match = compare_execution_results(true_data, predicted_data)
 
-        print(f"✅ Finished Query {index} | Match: {is_match}")
+        print(f"Finished Query {index} | Match: {is_match}")
 
         return {
             "prediction": predicted_sparql,
@@ -118,7 +118,7 @@ async def run_evaluation():
     ]
 
     # fire all off at once
-    print("🚀 Firing off tasks...")
+    print("Firing off tasks...")
     results = await asyncio.gather(*tasks)
 
     # sum up results
