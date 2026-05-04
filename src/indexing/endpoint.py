@@ -1,6 +1,7 @@
 """SPARQL Endpoint Connection - Connect to and query the SPARQL endpoint."""
 
 import httpx
+import json
 from typing import Optional
 from config.settings import SPARQL_ENDPOINT
 
@@ -9,7 +10,11 @@ _current_endpoint = None
 
 
 # Headers for SPARQL requests
-HEADERS = {"User-Agent": "NL-to-SPARQL-Agent/1.0 (Knowledge Graph Indexing System)"}
+# force to return json
+HEADERS = {
+    "User-Agent": "NL-to-SPARQL-Agent/1.0 (Knowledge Graph Indexing System)",
+    "Accept": "application/sparql-results+json, application/json",
+}
 
 
 def set_endpoint(endpoint: str):
@@ -34,14 +39,21 @@ async def test_connection():
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
-            response = await client.get(
+            # change to post request because some sparql endpoint servers default to returning html interface
+            response = await client.post(
                 current_endpoint,
-                params={"query": query, "format": "json"},
+                data={"query": query, "format": "json"},
                 headers=HEADERS,
                 timeout=120,
             )
             response.raise_for_status()
-            data = response.json()
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                print(
+                    f"Connection failed. Server returned non-JSON: {response.text[:200]}"
+                )
+                return False
 
             # ASK returns {"boolean": true/false}; legacy SELECT-shaped responses also accepted.
             if "boolean" in data or (
@@ -75,23 +87,29 @@ async def query_sparql(
     # If a shared client is passed in, use it
     if client:
         try:
-            response = await client.get(
+            response = await client.post(
                 current_endpoint,
-                params={"query": query, "format": format},
+                data={"query": query, "format": format},
                 headers=HEADERS,
                 timeout=120,  # Keep the bumped timeout!
             )
             response.raise_for_status()
-            return response.json()
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                print(
+                    f"Error: Expected JSON from {current_endpoint}, got HTML/Text: {response.text[:200]}"
+                )
+                return {}
         except Exception as e:
             print(f"Error executing SPARQL query: {e}")
             return {}
 
     async with httpx.AsyncClient(follow_redirects=True) as new_client:
         try:
-            response = await new_client.get(
+            response = await new_client.post(
                 current_endpoint,
-                params={"query": query, "format": format},
+                data={"query": query, "format": format},
                 headers=HEADERS,
                 timeout=120,
             )
@@ -116,9 +134,9 @@ async def query_sparql_custom(query: str, endpoint: str, format: str = "json") -
     """
     async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
-            response = await client.get(
+            response = await client.post(
                 endpoint,
-                params={"query": query, "format": format},
+                data={"query": query, "format": format},
                 headers=HEADERS,
                 timeout=60,
             )
