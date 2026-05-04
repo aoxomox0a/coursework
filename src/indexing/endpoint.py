@@ -40,9 +40,9 @@ async def test_connection():
     async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
             # change to post request because some sparql endpoint servers default to returning html interface
-            response = await client.post(
+            response = await client.get(
                 current_endpoint,
-                data={"query": query, "format": "json"},
+                params={"query": query, "format": "json"},
                 headers=HEADERS,
                 timeout=120,
             )
@@ -87,9 +87,9 @@ async def query_sparql(
     # If a shared client is passed in, use it
     if client:
         try:
-            response = await client.post(
+            response = await client.get(
                 current_endpoint,
-                data={"query": query, "format": format},
+                params={"query": query, "format": format},
                 headers=HEADERS,
                 timeout=120,  # Keep the bumped timeout!
             )
@@ -107,9 +107,9 @@ async def query_sparql(
 
     async with httpx.AsyncClient(follow_redirects=True) as new_client:
         try:
-            response = await new_client.post(
+            response = await new_client.get(
                 current_endpoint,
-                data={"query": query, "format": format},
+                params={"query": query, "format": format},
                 headers=HEADERS,
                 timeout=120,
             )
@@ -134,9 +134,9 @@ async def query_sparql_custom(query: str, endpoint: str, format: str = "json") -
     """
     async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
-            response = await client.post(
+            response = await client.get(
                 endpoint,
-                data={"query": query, "format": format},
+                params={"query": query, "format": format},
                 headers=HEADERS,
                 timeout=60,
             )
