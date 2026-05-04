@@ -95,7 +95,7 @@ async def generate_sparql(request: GenerateSparqlRequest):
         )
 
     try:
-        linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
+        linking_result = await asyncio.to_thread(run_linking_pipeline, [request.question])
         single_linking_result = linking_result[0]
         result = await run_sparql_pipeline(request.question, single_linking_result)
     except Exception as exc:
@@ -153,7 +153,7 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
         )
 
     try:
-        linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
+        linking_result = await asyncio.to_thread(run_linking_pipeline, [request.question])
         single_linking_result = linking_result[0]
         result = await run_sparql_pipeline(request.question, single_linking_result)
     except Exception as exc:
