@@ -21,7 +21,7 @@ db_client = httpx.AsyncClient(
 )
 
 
-async def execute_sparql_async(query, endpoint="https://dbpedia.org/sparql"):
+async def execute_sparql_async(query, endpoint):
     # executes sparql query against dbpedia endpoint
     # fetches and returns the bindings list for comparions
     try:
@@ -57,7 +57,7 @@ def compare_execution_results(true_data, predicted_data):
     return true_data == predicted_data
 
 
-async def process_single_question(item, semaphore, index):
+async def process_single_question(item, semaphore, index, endpoint):
     # orchestrates the evaluation of a single dataset item.
     # uses a semaphore to regulate the number of parallel tasks.
     async with semaphore:
@@ -67,7 +67,7 @@ async def process_single_question(item, semaphore, index):
         print(f"Starting Query {index}: {question[:50]}...")
 
         # entity and relation link
-        linking_results_list = run_linking_pipeline(question)
+        linking_results_list = run_linking_pipeline(question, endpoint)
         linking_result = linking_results_list[0] if linking_results_list else {}
 
         # generate sparql via llm
@@ -75,7 +75,7 @@ async def process_single_question(item, semaphore, index):
         predicted_sparql = pipeline_result.get("sparql_query", "")
 
         # fetch "true" data
-        true_data = await execute_sparql_async(true_sparql)
+        true_data = await execute_sparql_async(true_sparql, endpoint)
         is_match = False
 
         # fetch "predicted" data and compare
@@ -84,7 +84,7 @@ async def process_single_question(item, semaphore, index):
             and pipeline_result["status"] == "success"
             and predicted_sparql
         ):
-            predicted_data = await execute_sparql_async(predicted_sparql)
+            predicted_data = await execute_sparql_async(predicted_sparql, endpoint)
             is_match = compare_execution_results(true_data, predicted_data)
 
         print(f"Finished Query {index} | Match: {is_match}")
@@ -98,6 +98,7 @@ async def process_single_question(item, semaphore, index):
 
 
 async def run_evaluation():
+    endpoint = "https://dbpedia.org/sparql"
     # main evaluation loop
     # load data, run tasks concurrently
     # compute final BLEU and accuracy metrics
@@ -114,7 +115,8 @@ async def run_evaluation():
 
     # create a list of async tasks
     tasks = [
-        process_single_question(item, semaphore, i + 1) for i, item in enumerate(subset)
+        process_single_question(item, semaphore, i + 1, endpoint)
+        for i, item in enumerate(subset)
     ]
 
     # fire all off at once
