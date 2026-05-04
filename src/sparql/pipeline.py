@@ -19,7 +19,6 @@ def _load_profile_or_none(endpoint: str):
     try:
         from src.kg_profiles import profile_from_index
 
-        # 🌟 Use the passed endpoint, not the global get_endpoint()
         return profile_from_index(endpoint)
     except Exception as exc:
         logger.warning("Failed to load KG profile (%s) — using legacy prompt", exc)
