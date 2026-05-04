@@ -39,6 +39,13 @@ env/
 chroma.sqlite3
 
 # =========================
+# 3.b Evaluation runtime artifacts
+# =========================
+# Per-run evaluation reports (results.json + summary.md) are runtime
+# artifacts; reproducible by re-running scripts/evaluate_pipeline.py.
+/reports/
+
+# =========================
 # 4. IDEs & OS Files
 # =========================
 .vscode/

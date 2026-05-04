@@ -36,8 +36,12 @@ def run_linking_pipeline(questions: List[str], endpoint: str) -> List[Dict]:
             )
             entity_uris = entity_linking.disambiguate_entities(linking_results)
 
+            # top_k=10 gives the SPARQL prompt downstream more lexical breadth:
+            # under hybrid retrieval, terse-label predicates (HAS_DATASET /
+            # HAS_BENCHMARK / …) often surface at rank 5-9, so a tight top-3
+            # would drop them again.
             relation_candidates = relation_linking.find_relation_candidates(
-                doc.text, top_k=3, endpoint=endpoint
+                doc.text, top_k=10, endpoint=endpoint
             )
             selected_relation = relation_linking.select_relation(relation_candidates)
             print(f"✓ Found {len(relation_candidates)} property candidates")

@@ -65,7 +65,10 @@ async def run_sparql_pipeline(
     if not property_uri:
         logger.warning("No property URI available — attempting generation without it")
 
-    related = [c.get("uri") for c in relation_candidates if c.get("uri")]
+    # Pass full {uri, label, score} dicts to the prompt so the LLM can pick
+    # by label semantics (essential for ORKG where embedding scores compress
+    # candidates into a tight band — see hybrid retrieval rationale).
+    related = [c for c in relation_candidates if c.get("uri")]
 
     # Step 1: Generate prompt and call LLM
     logger.info("Generating SPARQL prompt for: %s", question)

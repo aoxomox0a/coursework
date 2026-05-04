@@ -306,44 +306,91 @@ def query_entities_in_chroma(
     return results
 
 
-def query_candidates(
-    query_text: str,
-    collection_name: str,
-    endpoint: str = None,
-    top_k: int = 5,
+# Pool size before fusion. Pull a wider net from each scorer so RRF has
+# enough overlap to reward items that both scorers like.
+_HYBRID_POOL = 20
+
+
+def _dense_query(
+    scoped_name: str, query_text: str, n: int
 ) -> list[dict]:
-    """
-    Similarity search against an endpoint-scoped collection, returning formatted
-    {uri, label, score} candidates. Shared helper for entity / relation linking.
-
-    Args:
-        query_text: Text to embed and search with.
-        collection_name: Base collection name (e.g. "entities", "properties").
-        endpoint: Optional SPARQL endpoint URL — selects the endpoint-scoped collection.
-        top_k: Maximum number of candidates to return.
-
-    Returns:
-        List of {"uri", "label", "score"} dicts; empty list if no matches.
-    """
+    """Dense (Chroma) retrieval, formatted as {uri, label, score} dicts."""
     client = _get_client()
-    scoped_name = get_collection_name(collection_name, endpoint)
     collection = client.get_collection(name=scoped_name)
-
-    raw = collection.query(query_texts=[query_text], n_results=top_k)
+    raw = collection.query(query_texts=[query_text], n_results=n)
 
     if not raw or not raw.get("metadatas") or not raw["metadatas"]:
         return []
 
-    formatted: list[dict] = []
+    out: list[dict] = []
     metadatas = raw["metadatas"][0]
     distances = raw["distances"][0] if raw.get("distances") else [0] * len(metadatas)
     for metadata, distance in zip(metadatas, distances):
         similarity = 1 / (1 + distance) if distance > 0 else 1.0
-        formatted.append(
+        out.append(
             {
                 "uri": metadata.get("uri", ""),
                 "label": metadata.get("label", ""),
                 "score": similarity,
             }
         )
-    return formatted
+    return out
+
+
+def query_candidates(
+    query_text: str,
+    collection_name: str,
+    endpoint: str = None,
+    top_k: int = 5,
+    hybrid: bool = True,
+) -> list[dict]:
+    """
+    Similarity search against an endpoint-scoped collection, returning formatted
+    {uri, label, score} candidates. Shared helper for entity / relation linking.
+
+    By default uses hybrid retrieval (dense embeddings ⊕ BM25, fused via RRF):
+    this surfaces terse-label predicates (e.g. ORKG's `HAS_DATASET`) that
+    MiniLM alone buries under verbose user-contributed predicates and
+    empty-label system entries. Falls back to dense-only on any BM25 error so
+    callers never get a worse-than-baseline result.
+
+    Args:
+        query_text: Text to embed and search with.
+        collection_name: Base collection name (e.g. "entities", "properties").
+        endpoint: Optional SPARQL endpoint URL — selects the endpoint-scoped collection.
+        top_k: Maximum number of candidates to return.
+        hybrid: When True (default), fuse dense + BM25 via RRF.
+
+    Returns:
+        List of {"uri", "label", "score"} dicts; empty list if no matches.
+        ``score`` is the dense cosine similarity in dense-only mode and the
+        RRF score in hybrid mode (the two scales are NOT comparable; treat
+        ``score`` as a within-call ranking signal only).
+    """
+    scoped_name = get_collection_name(collection_name, endpoint)
+
+    if not hybrid:
+        return _dense_query(scoped_name, query_text, top_k)
+
+    # Hybrid path: pull a pool from each scorer, fuse by RRF, take top_k.
+    dense_hits = _dense_query(scoped_name, query_text, _HYBRID_POOL)
+
+    try:
+        from src.indexing.bm25_index import get_bm25_index
+        from src.indexing.hybrid_retrieval import reciprocal_rank_fusion
+
+        bm25 = get_bm25_index(scoped_name)
+        bm25_hits = bm25.query(query_text, top_n=_HYBRID_POOL)
+
+        dense_ranked = [(h["uri"], h["label"]) for h in dense_hits]
+        lexical_ranked = [(h.uri, h.label) for h in bm25_hits]
+        fused = reciprocal_rank_fusion([dense_ranked, lexical_ranked])
+    except Exception:
+        # BM25 build/query failure: silently fall back to dense-only so we
+        # never regress below the pre-hybrid baseline.
+        return dense_hits[:top_k]
+
+    return [
+        {"uri": h.uri, "label": h.label, "score": h.score}
+        for h in fused[:top_k]
+    ]
