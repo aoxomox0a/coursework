@@ -158,10 +158,29 @@ def _render_entity_list(entity_uris: list[str]) -> str:
     return "\n".join(f"  <{uri}>" for uri in entity_uris)
 
 
-def _render_related_list(related_properties: list[str]) -> str:
+def _render_related_list(related_properties: list) -> str:
+    """Render the candidate properties block.
+
+    Accepts either bare URI strings (legacy) or dicts ``{uri, label, score}``
+    (preferred — gives the LLM a label to reason over). Multi-hop SciQA-style
+    questions need the LLM to *pick the right predicate* among several with
+    different labels, so labels matter as much as URIs.
+    """
     if not related_properties:
         return "  (none)"
-    return "\n".join(f"  <{p}>" for p in related_properties)
+    rendered = []
+    for p in related_properties:
+        if isinstance(p, dict):
+            uri = p.get("uri", "")
+            label = p.get("label", "")
+            if not uri:
+                continue
+            rendered.append(
+                f"  <{uri}>  — \"{label}\"" if label else f"  <{uri}>"
+            )
+        else:
+            rendered.append(f"  <{p}>")
+    return "\n".join(rendered) if rendered else "  (none)"
 
 
 def _render_prefix_block(prefixes: tuple[tuple[str, str], ...]) -> str:
