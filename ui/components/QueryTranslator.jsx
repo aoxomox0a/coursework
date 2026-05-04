@@ -293,7 +293,7 @@ export default function QueryTranslator() {
             });
 
             if (response.data.status === "success") {
-                setNlAnswer(response.data.message || "");
+                setNlAnswer(response.data.answer || "");
                 setAnswerError("");
             } else {
                 setAnswerError(response.data.error || "Answer failed");
