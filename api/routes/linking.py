@@ -14,6 +14,7 @@ class QuestionRequest(BaseModel):
 
     # keep this
     question: str
+    endpoint: str
 
 
 @router.post("/link")
@@ -30,7 +31,7 @@ def link_entities_and_relations(request: QuestionRequest):
     question = request.question
     # create list
     batch_input = [question]
-    full_result = run_linking_pipeline(batch_input)
+    full_result = run_linking_pipeline(batch_input, request.endpoint)
 
     result = full_result[0]
 

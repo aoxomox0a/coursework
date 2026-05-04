@@ -37,7 +37,7 @@ async def test_connection():
     current_endpoint = get_endpoint()
     print(f"Testing connection to: {current_endpoint}")
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
+    async with httpx.AsyncClient(follow_redirects=True, verify=False) as client:
         try:
             # change to post request because some sparql endpoint servers default to returning html interface
             response = await client.get(
@@ -105,7 +105,7 @@ async def query_sparql(
             print(f"Error executing SPARQL query: {e}")
             return {}
 
-    async with httpx.AsyncClient(follow_redirects=True) as new_client:
+    async with httpx.AsyncClient(follow_redirects=True, verify=False) as new_client:
         try:
             response = await new_client.get(
                 current_endpoint,
@@ -132,7 +132,7 @@ async def query_sparql_custom(query: str, endpoint: str, format: str = "json") -
     Returns:
         Query results as dict
     """
-    async with httpx.AsyncClient(follow_redirects=True) as client:
+    async with httpx.AsyncClient(follow_redirects=True, verify=False) as client:
         try:
             response = await client.get(
                 endpoint,

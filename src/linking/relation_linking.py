@@ -1,14 +1,15 @@
 """
 Link relations in questions to properties in knowledge graph.
 """
+
 from typing import List, Dict
 
 from src.indexing.chroma_storage import query_candidates
-from src.indexing.endpoint import get_endpoint
 
 
 def find_relation_candidates(
     question: str,
+    endpoint: str,
     top_k: int = 5,
 ) -> List[Dict[str, any]]:
     """
@@ -27,7 +28,7 @@ def find_relation_candidates(
     return query_candidates(
         query_text=question,
         collection_name="properties",
-        endpoint=get_endpoint(),
+        endpoint=endpoint,
         top_k=top_k,
     )
 
