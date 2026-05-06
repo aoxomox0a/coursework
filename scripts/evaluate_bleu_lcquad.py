@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.WARNING)
 logging.getLogger("src.sparql.execution").setLevel(logging.CRITICAL)
 
 CONCURRENTY_LIMIT = 10
-TEST_RANGE = 300
+TEST_RANGE = 50
 
 # global client for connection pooling
 db_client = httpx.AsyncClient(
@@ -62,10 +62,16 @@ async def execute_sparql_async(
             else:
                 return None  # Bad query syntax, don't retry
 
-        except (httpx.ReadTimeout, httpx.ConnectError) as e:
-            wait_time = 2**attempt
-            logging.warning(f"Connection error. Retrying in {wait_time}s...")
+        except (httpx.TimeoutException, httpx.NetworkError) as e:
+            # calculate exponential backoff with jitter
+            base_wait = 1 << attempt
+            wait_time = base_wait + random.random()
+
+            logging.warning(
+                f"Network error ({type(e).__name__}) - Retrying in {wait_time:.2f}s..."
+            )
             await asyncio.sleep(wait_time)
+            continue
 
     return None  # Failed after all retries
 
