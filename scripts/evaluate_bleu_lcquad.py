@@ -16,9 +16,10 @@ from src.sparql.pipeline import run_sparql_pipeline
 from src.linking.pipeline import run_linking_pipeline
 
 logging.basicConfig(level=logging.WARNING)
+logging.getLogger("src.sparql.execution").setLevel(logging.CRITICAL)
 
 CONCURRENTY_LIMIT = 10
-TEST_RANGE = 100
+TEST_RANGE = 300
 
 # global client for connection pooling
 db_client = httpx.AsyncClient(
@@ -47,7 +48,7 @@ async def execute_sparql_async(
 
             if response.status_code == 200:
                 return response.json().get("results", {}).get("bindings", [])
-            elif response.status_code in [429, 503, 504]:
+            elif response.status_code in [429, 503, 504, 500]:
                 # Server is overwhelmed, use exponential backoff to calcualte waiting time
                 base_wait = 1 << attempt
                 # add jitter so concurrent reqs dont hit server at same time
