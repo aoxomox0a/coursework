@@ -5,17 +5,21 @@ Linking Pipeline: Orchestrate entity and relation linking.
 from src.linking import entity_extraction, entity_linking, relation_linking, spacy_setup
 from typing import List, Dict
 import torch
+import logging
+
+# Initialize the logger for this specific module
+logger = logging.getLogger(__name__)
 
 
 def run_linking_pipeline(questions: List[str]) -> List[Dict]:
-    print(f"Starting Linking Pipeline...")
-    print(f"Question: {questions}\n")
+    logger.debug("Starting Linking Pipeline...")
+    logger.debug(f"Question: {questions}")
 
     # pass string into list is single string
     if isinstance(questions, str):
         questions = [questions]
 
-    print("1. Loading spaCy model...")
+    logger.debug("1. Loading spaCy model...")
     nlp = spacy_setup.load_spacy_model()
     result = []
 
@@ -42,9 +46,9 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
                 doc.text, top_k=10
             )
             selected_relation = relation_linking.select_relation(relation_candidates)
-            print(f"✓ Found {len(relation_candidates)} property candidates")
+            logger.debug(f"✓ Found {len(relation_candidates)} property candidates")
             if selected_relation:
-                print(
+                logger.debug(
                     f"  Selected: {selected_relation['label']} ({selected_relation['uri']})"
                 )
 
@@ -57,12 +61,15 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
                 }
             )
 
-    print("\n✓ Linking Pipeline Completed Successfully!")
+    logger.debug("✓ Linking Pipeline Completed Successfully!")
     return result
 
 
 if __name__ == "__main__":
     # run_linking_pipeline expects a single str, not a list
+    # Because we run this directly, let's turn debug logs on just for testing
+    logging.basicConfig(level=logging.DEBUG)
+
     test_questions = [
         "Who directed the movie Inception released in 2010?",
         "Who directed Inception?",
@@ -73,3 +80,4 @@ if __name__ == "__main__":
     ]
     # test_question = "Who is the author of The Great Gatsby?"
     result = run_linking_pipeline(test_questions)
+
