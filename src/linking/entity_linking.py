@@ -9,7 +9,7 @@ from src.indexing.chroma_storage import query_candidates
 
 def link_entities(
     extracted_entities: List[str],
-    endpoint: str = None,
+    endpoint: str,
     top_k: int = 3,
 ) -> List[Dict[str, any]]:
     """
