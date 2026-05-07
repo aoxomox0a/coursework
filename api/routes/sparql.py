@@ -77,27 +77,23 @@ async def generate_sparql(request: GenerateSparqlRequest):
     Returns:
         GenerateSparqlResponse with status, question, and SPARQL query
     """
-    if not is_endpoint_indexed(SPARQL_ENDPOINT):
-        status_msg = (
-            "Endpoint indexing is currently in progress."
-            if is_indexing_in_progress()
-            else "Endpoint index is missing or failed to initialize on startup."
-        )
-        logger.warning(
-            f"SPARQL generation rejected: Index unavailable for {SPARQL_ENDPOINT}. State: {status_msg}"
-        )
+    if not is_endpoint_indexed(request.endpoint):
         return JSONResponse(
-            status_code=202 if is_indexing_in_progress() else 503,
+            status_code=503,
             content={
-                "status": "indexing" if is_indexing_in_progress() else "error",
-                "message": f"{status_msg} Please try again later.",
+                "status": "error",
+                "message": f"Index missing for {request.endpoint}",
             },
         )
 
     try:
-        linking_result = await asyncio.to_thread(run_linking_pipeline, [request.question])
+        linking_result = await asyncio.to_thread(
+            run_linking_pipeline, [request.question], request.endpoint
+        )
         single_linking_result = linking_result[0]
-        result = await run_sparql_pipeline(request.question, single_linking_result)
+        result = await run_sparql_pipeline(
+            request.question, single_linking_result, endpoint=request.endpoint
+        )
     except Exception as exc:
         logger.error(
             "SPARQL generation error for question '%s': %s", request.question, exc
@@ -135,27 +131,23 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
     Returns:
         AnswerResponse with status, question, answer, and optional error
     """
-    if not is_endpoint_indexed(SPARQL_ENDPOINT):
-        status_msg = (
-            "Endpoint indexing is currently in progress."
-            if is_indexing_in_progress()
-            else "Endpoint index is missing or failed to initialize on startup."
-        )
-        logger.warning(
-            f"Query rejected: Index unavailable for {SPARQL_ENDPOINT}. State: {status_msg}"
-        )
+    if not is_endpoint_indexed(request.endpoint):
         return JSONResponse(
-            status_code=202 if is_indexing_in_progress else 503,
+            status_code=503,
             content={
-                "status": "indexing" if is_indexing_in_progress() else "error",
-                "message": f"{status_msg} Please try again later.",
+                "status": "error",
+                "message": f"Index missing for {request.endpoint}",
             },
         )
 
     try:
-        linking_result = await asyncio.to_thread(run_linking_pipeline, [request.question])
-        single_linking_result = linking_result[0]
-        result = await run_sparql_pipeline(request.question, single_linking_result)
+        linking_result = await asyncio.to_thread(
+            run_linking_pipeline, [request.question], request.endpoint
+        )
+        single_linking_dict = linking_result[0]
+        result = await run_sparql_pipeline(
+            request.question, single_linking_dict, endpoint=request.endpoint
+        )
     except Exception as exc:
         logger.error("Pipeline error for question '%s': %s", request.question, exc)
         return JSONResponse(status_code=500, content={"detail": str(exc)})

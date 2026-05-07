@@ -9,7 +9,7 @@ from src.sparql import prompt, llm, validation, execution
 logger = logging.getLogger(__name__)
 
 
-def _load_profile_or_none():
+def _load_profile_or_none(endpoint: str):
     """Try to derive a KGProfile for the current endpoint from the indexed state.
 
     Returns None (and falls back to the legacy prompt) when indexing has not
@@ -17,18 +17,10 @@ def _load_profile_or_none():
     before the agnostic pipeline has been bootstrapped.
     """
     try:
-        from src.indexing.endpoint import get_endpoint
         from src.kg_profiles import profile_from_index
 
-        return profile_from_index(get_endpoint())
-    except FileNotFoundError:
-        logger.info(
-            "No persisted KG profile for the current endpoint — using legacy prompt"
-        )
-        return None
-    except (
-        Exception
-    ) as exc:  # defensive: never fail the SPARQL pipeline on a profile issue
+        return profile_from_index(endpoint)
+    except Exception as exc:
         logger.warning("Failed to load KG profile (%s) — using legacy prompt", exc)
         return None
 
@@ -41,7 +33,7 @@ class SparqlPipelineResult(TypedDict):
 
 
 async def run_sparql_pipeline(
-    question: str, linking_result: dict
+    question: str, linking_result: dict, endpoint=None
 ) -> SparqlPipelineResult:
     """
     Execute the complete SPARQL generation & execution pipeline:
@@ -80,7 +72,7 @@ async def run_sparql_pipeline(
 
     # Step 1: Generate prompt and call LLM
     logger.info("Generating SPARQL prompt for: %s", question)
-    profile = _load_profile_or_none()
+    profile = _load_profile_or_none(endpoint=endpoint)
     sparql_prompt = prompt.generate_sparql_prompt(
         question=question,
         entity_uris=entity_uris,
@@ -116,7 +108,7 @@ async def run_sparql_pipeline(
     logger.info("Query validated successfully")
 
     # Step 3: Execute
-    answer = await execution.execute_and_format(generated_query)
+    answer = await execution.execute_and_format(generated_query, endpoint=endpoint)
     logger.info("Query executed: %s", answer[:100])
 
     nl_answer_prompt = prompt.generate_answer_prompt(

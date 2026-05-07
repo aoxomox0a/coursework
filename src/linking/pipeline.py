@@ -7,7 +7,7 @@ from typing import List, Dict
 import torch
 
 
-def run_linking_pipeline(questions: List[str]) -> List[Dict]:
+def run_linking_pipeline(questions: List[str], endpoint: str) -> List[Dict]:
     print(f"Starting Linking Pipeline...")
     print(f"Question: {questions}\n")
 
@@ -31,7 +31,9 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
             entity_strings = entity_extraction.combine_candidates(
                 extracted_entities, noun_phrases, noun_chunks
             )
-            linking_results = entity_linking.link_entities(entity_strings)
+            linking_results = entity_linking.link_entities(
+                entity_strings, endpoint=endpoint
+            )
             entity_uris = entity_linking.disambiguate_entities(linking_results)
 
             # top_k=10 gives the SPARQL prompt downstream more lexical breadth:
@@ -39,7 +41,7 @@ def run_linking_pipeline(questions: List[str]) -> List[Dict]:
             # HAS_BENCHMARK / …) often surface at rank 5-9, so a tight top-3
             # would drop them again.
             relation_candidates = relation_linking.find_relation_candidates(
-                doc.text, top_k=10
+                doc.text, top_k=10, endpoint=endpoint
             )
             selected_relation = relation_linking.select_relation(relation_candidates)
             print(f"✓ Found {len(relation_candidates)} property candidates")

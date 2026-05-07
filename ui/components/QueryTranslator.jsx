@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import styles from "../styles/QueryTranslator.module.css";
 import Editor from "@monaco-editor/react";
+import { useStatus } from "../context/StatusContext";
 
 const PREDEFINED_QUERIES = [
     {
@@ -33,6 +34,7 @@ const getRandomMusicUrl = () => {
 };
 
 export default function QueryTranslator() {
+    const { addStatus } = useStatus();
     const [currentEndpoint, setCurrentEndpoint] = useState("http://dbpedia.org/sparql");
     const [isIndexing, setIsIndexing] = useState(false);
     const [indexStatus, setIndexStatus] = useState("unknown");
@@ -291,6 +293,15 @@ export default function QueryTranslator() {
                 question: nlInput,
                 endpoint: currentEndpoint,
             });
+
+            // catch new endpoint
+            if (response.status === 202 || response.data.status === "indexing") {
+                setNlAnswer("Exploring this new Knowledge Graph... Schema indexing started in the background.");
+                if (!isIndexing) {
+                    handleIndexLink(); // Automatically start listening to the SSE stream!
+                }
+                return; // Exit early, don't show an error
+            }
 
             if (response.data.status === "success") {
                 setNlAnswer(response.data.answer || "");
