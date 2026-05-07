@@ -1,14 +1,15 @@
 """
 Link extracted entities to URIs in knowledge graph using ChromaDB.
 """
+
 from typing import List, Dict
 
 from src.indexing.chroma_storage import query_candidates
-from src.indexing.endpoint import get_endpoint
 
 
 def link_entities(
     extracted_entities: List[str],
+    endpoint: str,
     top_k: int = 3,
 ) -> List[Dict[str, any]]:
     """
@@ -25,7 +26,7 @@ def link_entities(
     Returns:
         List of {entity, candidates} dicts.
     """
-    endpoint = get_endpoint()
+    # endpoint = get_endpoint()
     results = []
     for entity in extracted_entities:
         candidates = query_candidates(

@@ -7,7 +7,7 @@ from typing import Dict
 
 
 async def run_indexing_pipeline(
-    custom_endpoint: str = None, status_callback=None, max_entities: int = None
+    custom_endpoint: str = "", status_callback=None, max_entities: int = 10000
 ) -> Dict:
     """
     Execute the complete indexing pipeline:
@@ -86,7 +86,7 @@ async def run_indexing_pipeline(
     entity_limit = max_entities if max_entities is not None else LIMIT_ENTITIES
 
     required_batches = (
-        max(1, math.ceil(entity_limit / BATCH_SIZE)) if entity_limit > 0 else None
+        max(1, math.ceil(entity_limit / BATCH_SIZE)) if entity_limit > 0 else 0
     )
     fetched_entities = await entities.fetch_entities_batch(
         batch_size=BATCH_SIZE,

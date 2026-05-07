@@ -3,14 +3,13 @@ SPARQL Pipeline: Orchestrate prompt generation, LLM call, validation, and execut
 """
 
 import logging
-from typing import TypedDict, Dict, List
+from typing import TypedDict
 from src.sparql import prompt, llm, validation, execution
-import asyncio
 
 logger = logging.getLogger(__name__)
 
 
-def _load_profile_or_none():
+def _load_profile_or_none(endpoint: str):
     """Try to derive a KGProfile for the current endpoint from the indexed state.
 
     Returns None (and falls back to the legacy prompt) when indexing has not
@@ -18,7 +17,6 @@ def _load_profile_or_none():
     before the agnostic pipeline has been bootstrapped.
     """
     try:
-        from src.indexing.endpoint import get_endpoint
         from src.kg_profiles import profile_from_index
 
         return profile_from_index(get_endpoint())
@@ -81,7 +79,7 @@ def get_required_prefixes(query_text: str) -> str:
 
 
 async def run_sparql_pipeline(
-    question: str, linking_result: dict
+    question: str, linking_result: dict, endpoint=None
 ) -> SparqlPipelineResult:
     """
     Execute the complete SPARQL generation & execution pipeline:
@@ -120,7 +118,7 @@ async def run_sparql_pipeline(
 
     # Step 1: Generate prompt and call LLM
     logger.info("Generating SPARQL prompt for: %s", question)
-    profile = _load_profile_or_none()
+    profile = _load_profile_or_none(endpoint=endpoint)
     sparql_prompt = prompt.generate_sparql_prompt(
         question=question,
         entity_uris=entity_uris,
@@ -158,12 +156,18 @@ async def run_sparql_pipeline(
     logger.info("Query validated successfully")
 
     # Step 3: Execute
-    answer = await execution.execute_and_format(generated_query)
+    answer = await execution.execute_and_format(generated_query, endpoint=endpoint)
     logger.info("Query executed: %s", answer[:100])
+
+    nl_answer_prompt = prompt.generate_answer_prompt(
+        question=question, sparql_query=generated_query, raw_result=answer
+    )
+
+    nl_answer = await llm.call_llm(nl_answer_prompt)
 
     return SparqlPipelineResult(
         status="success",
-        answer=answer,
+        answer=nl_answer,
         sparql_query=generated_query,
         error_message=None,
     )

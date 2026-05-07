@@ -15,6 +15,7 @@ Usage:
   uv run --group evaluation python scripts/evaluate_pipeline.py --limit 5
   uv run --group evaluation python scripts/evaluate_pipeline.py --judge
 """
+
 import argparse
 import asyncio
 import json
@@ -61,23 +62,39 @@ def _print_summary(suite) -> None:
     print(f"  Algebra match      {f.algebra_match}/{f.total}  (corroborative)")
     print()
     print("Self-correction lift:")
-    print(f"  First-pass valid   {sc.first_pass_valid_count}/{sc.total}  ({sc.first_pass_rate*100:.1f}%)")
-    print(f"  After retry        {sc.after_retry_valid_count}/{sc.total}  ({sc.after_retry_rate*100:.1f}%)")
+    print(
+        f"  First-pass valid   {sc.first_pass_valid_count}/{sc.total}  ({sc.first_pass_rate * 100:.1f}%)"
+    )
+    print(
+        f"  After retry        {sc.after_retry_valid_count}/{sc.total}  ({sc.after_retry_rate * 100:.1f}%)"
+    )
     print(f"  Recovered by retry {sc.recovered_by_retry}")
     print("=" * 60)
 
 
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gold", type=Path, default=DEFAULT_GOLD,
-                        help="Path to the gold-set JSONL")
-    parser.add_argument("--limit", type=int, default=None,
-                        help="Evaluate only the first N items (for smoke testing)")
-    parser.add_argument("--judge", action="store_true",
-                        help="Run the LLM-as-a-Judge over each answer (cost-sensitive)")
-    parser.add_argument("--out-dir", type=Path, default=None,
-                        help="Where to write results.json + summary.md "
-                             "(default: reports/<UTC-timestamp>)")
+    parser.add_argument(
+        "--gold", type=Path, default=DEFAULT_GOLD, help="Path to the gold-set JSONL"
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Evaluate only the first N items (for smoke testing)",
+    )
+    parser.add_argument(
+        "--judge",
+        action="store_true",
+        help="Run the LLM-as-a-Judge over each answer (cost-sensitive)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="Where to write results.json + summary.md "
+        "(default: reports/<UTC-timestamp>)",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -90,7 +107,10 @@ async def main() -> int:
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     if not args.gold.exists():
-        logger.error("Gold set not found at %s — run scripts/prepare_sciqa_gold.py first.", args.gold)
+        logger.error(
+            "Gold set not found at %s — run scripts/prepare_sciqa_gold.py first.",
+            args.gold,
+        )
         return 1
 
     items = _load_gold(args.gold)
@@ -107,6 +127,8 @@ async def main() -> int:
         "item_count": len(items),
         "judge_enabled": args.judge,
     }
+
+    # Run the actual imported runner
     suite = await run_evaluation(items, judge_enabled=args.judge, config=config)
 
     write_report(suite, args.out_dir)
@@ -117,3 +139,4 @@ async def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
+

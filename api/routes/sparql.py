@@ -27,6 +27,8 @@ class AnswerRequest(BaseModel):
     question: str = Field(
         ..., min_length=1, max_length=1000, description="Natural language question"
     )
+    # tell fastapi to expect an endpoint inside request, otherwise default to SPARQL_ENDPOINT
+    endpoint: str = Field(default=SPARQL_ENDPOINT, description="Target endpoint")
 
 
 class AnswerResponse(BaseModel):
@@ -38,9 +40,7 @@ class AnswerResponse(BaseModel):
 
 
 class ExplainRequest(BaseModel):
-    sparql_query: str = Field(
-        ..., min_length=1, description="SPARQL query to explain"
-    )
+    sparql_query: str = Field(..., min_length=1, description="SPARQL query to explain")
 
 
 class ExplainResponse(BaseModel):
@@ -54,6 +54,8 @@ class GenerateSparqlRequest(BaseModel):
     question: str = Field(
         ..., min_length=1, max_length=1000, description="Natural language question"
     )
+    # tell fastapi to expect an endpoint inside request, otherwise default to SPARQL_ENDPOINT
+    endpoint: str = Field(default=SPARQL_ENDPOINT, description="Target endpoint")
 
 
 class GenerateSparqlResponse(BaseModel):
@@ -64,10 +66,14 @@ class GenerateSparqlResponse(BaseModel):
 
 
 @router.post("/generate-sparql")
-async def generate_sparql(request: GenerateSparqlRequest):
+async def generate_sparql(
+    request: GenerateSparqlRequest, background_tasks: BackgroundTasks
+):
     """
     Generate SPARQL query from natural language (without executing).
-    Use this after indexing to get just the SPARQL query.
+
+    If the SPARQL endpoint has not yet been indexed, indexing is triggered
+    automatically in the background and a 202 response is returned.
 
     Args:
         request: GenerateSparqlRequest with 'question' field
@@ -75,29 +81,39 @@ async def generate_sparql(request: GenerateSparqlRequest):
     Returns:
         GenerateSparqlResponse with status, question, and SPARQL query
     """
-    if not is_endpoint_indexed(SPARQL_ENDPOINT):
-        status_msg = (
-            "Endpoint indexing is currently in progress."
-            if is_indexing_in_progress()
-            else "Endpoint index is missing or failed to initialize on startup."
-        )
-        logger.warning(
-            f"SPARQL generation rejected: Index unavailable for {SPARQL_ENDPOINT}. State: {status_msg}"
-        )
-        return JSONResponse(
-            status_code=202 if is_indexing_in_progress() else 503,
-            content={
-                "status": "indexing" if is_indexing_in_progress() else "error",
-                "message": f"{status_msg} Please try again later.",
-            },
-        )
+    if not is_endpoint_indexed(request.endpoint):
+        # Fix the missing parens bug your teammate mentioned
+        if is_indexing_in_progress():
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Indexing for {request.endpoint} is already in progress.",
+                },
+            )
+        else:
+            # Trigger the background task and return 202
+            background_tasks.add_task(managed_indexing_task, request.endpoint)
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Schema indexing started for {request.endpoint}.",
+                },
+            )
 
     try:
-        linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
+        linking_result = await asyncio.to_thread(
+            run_linking_pipeline, [request.question], request.endpoint
+        )
         single_linking_result = linking_result[0]
-        result = await run_sparql_pipeline(request.question, single_linking_result)
+        result = await run_sparql_pipeline(
+            request.question, single_linking_result, endpoint=request.endpoint
+        )
     except Exception as exc:
-        logger.error("SPARQL generation error for question '%s': %s", request.question, exc)
+        logger.error(
+            "SPARQL generation error for question '%s': %s", request.question, exc
+        )
         return JSONResponse(status_code=500, content={"detail": str(exc)})
 
     if result["status"] == "error":
@@ -131,27 +147,35 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
     Returns:
         AnswerResponse with status, question, answer, and optional error
     """
-    if not is_endpoint_indexed(SPARQL_ENDPOINT):
-        status_msg = (
-            "Endpoint indexing is currently in progress."
-            if is_indexing_in_progress()
-            else "Endpoint index is missing or failed to initialize on startup."
-        )
-        logger.warning(
-            f"Query rejected: Index unavailable for {SPARQL_ENDPOINT}. State: {status_msg}"
-        )
-        return JSONResponse(
-            status_code=202 if is_indexing_in_progress else 503,
-            content={
-                "status": "indexing" if is_indexing_in_progress() else "error",
-                "message": f"{status_msg} Please try again later.",
-            },
-        )
+    if not is_endpoint_indexed(request.endpoint):
+        # Fix the missing parens bug your teammate mentioned
+        if is_indexing_in_progress():
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Indexing for {request.endpoint} is already in progress.",
+                },
+            )
+        else:
+            # Trigger the background task and return 202
+            background_tasks.add_task(managed_indexing_task, request.endpoint)
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Schema indexing started for {request.endpoint}.",
+                },
+            )
 
     try:
-        linking_result = await asyncio.to_thread(run_linking_pipeline, request.question)
-        single_linking_result = linking_result[0]
-        result = await run_sparql_pipeline(request.question, single_linking_result)
+        linking_result = await asyncio.to_thread(
+            run_linking_pipeline, [request.question], request.endpoint
+        )
+        single_linking_dict = linking_result[0]
+        result = await run_sparql_pipeline(
+            request.question, single_linking_dict, endpoint=request.endpoint
+        )
     except Exception as exc:
         logger.error("Pipeline error for question '%s': %s", request.question, exc)
         return JSONResponse(status_code=500, content={"detail": str(exc)})
@@ -205,7 +229,9 @@ async def explain_sparql(request: ExplainRequest):
         )
 
     except Exception as exc:
-        logger.error("Question generation error for query '%s': %s", request.sparql_query, exc)
+        logger.error(
+            "Question generation error for query '%s': %s", request.sparql_query, exc
+        )
         return ExplainResponse(
             status="error",
             sparql_query=request.sparql_query,

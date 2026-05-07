@@ -140,6 +140,17 @@ SPARQL Query:
 Natural Language Question:
 """
 
+ANSWER_GENERATION_TEMPLATE = """\
+    You are given:
+    - Question: {question}
+    - SPARQL query: {sparql_query}
+    - Query result: {raw_result}
+
+    Convert the result into a concise natural language answer.
+    If multiple values, summarize clearly.
+    Only output the answer.
+"""
+
 
 def _render_entity_list(entity_uris: list[str]) -> str:
     if not entity_uris:
@@ -285,3 +296,9 @@ def generate_sparql_explanation_prompt(sparql_query: str) -> str:
         Formatted explanation prompt string
     """
     return SPARQL_EXPLANATION_TEMPLATE.format(sparql_query=sparql_query)
+
+
+def generate_answer_prompt(question: str, sparql_query: str, raw_result: str) -> str:
+    return ANSWER_GENERATION_TEMPLATE.format(
+        question=question, sparql_query=sparql_query, raw_result=raw_result
+    )

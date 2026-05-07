@@ -35,7 +35,7 @@ def toggle_indexing_state(is_active: bool):
         broadcast_status_update(endpoint)
 
 
-def update_status(step: str, endpoint: str = None, error: str = None) -> None:
+def update_status(step: str, endpoint: str = "", error: str = "") -> None:
     with _lock:
         _status["current_step"] = step
         if endpoint is not None:

@@ -25,12 +25,12 @@ router = APIRouter()
 class IndexRequest(BaseModel):
     """Request model for indexing."""
 
-    endpoint: str = None
-    max_entities: int = None
+    endpoint: str = ""
+    max_entities: int = 10000
 
 
 # create async wrapper to manage the UI state while the background task runs
-async def managed_indexing_task(endpoint: str, max_entities: int = None):
+async def managed_indexing_task(endpoint: str, max_entities: int = 10000):
     print(f"\n🚀 [managed_indexing_task] Starting for endpoint: {endpoint}")
     toggle_indexing_state(True)
     update_status("Starting indexing...", endpoint)
