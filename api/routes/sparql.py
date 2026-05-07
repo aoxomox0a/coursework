@@ -66,10 +66,14 @@ class GenerateSparqlResponse(BaseModel):
 
 
 @router.post("/generate-sparql")
-async def generate_sparql(request: GenerateSparqlRequest):
+async def generate_sparql(
+    request: GenerateSparqlRequest, background_tasks: BackgroundTasks
+):
     """
     Generate SPARQL query from natural language (without executing).
-    Use this after indexing to get just the SPARQL query.
+
+    If the SPARQL endpoint has not yet been indexed, indexing is triggered
+    automatically in the background and a 202 response is returned.
 
     Args:
         request: GenerateSparqlRequest with 'question' field
@@ -78,13 +82,25 @@ async def generate_sparql(request: GenerateSparqlRequest):
         GenerateSparqlResponse with status, question, and SPARQL query
     """
     if not is_endpoint_indexed(request.endpoint):
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "error",
-                "message": f"Index missing for {request.endpoint}",
-            },
-        )
+        # Fix the missing parens bug your teammate mentioned
+        if is_indexing_in_progress():
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Indexing for {request.endpoint} is already in progress.",
+                },
+            )
+        else:
+            # Trigger the background task and return 202
+            background_tasks.add_task(managed_indexing_task, request.endpoint)
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Schema indexing started for {request.endpoint}.",
+                },
+            )
 
     try:
         linking_result = await asyncio.to_thread(
@@ -132,13 +148,25 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
         AnswerResponse with status, question, answer, and optional error
     """
     if not is_endpoint_indexed(request.endpoint):
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "error",
-                "message": f"Index missing for {request.endpoint}",
-            },
-        )
+        # Fix the missing parens bug your teammate mentioned
+        if is_indexing_in_progress():
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Indexing for {request.endpoint} is already in progress.",
+                },
+            )
+        else:
+            # Trigger the background task and return 202
+            background_tasks.add_task(managed_indexing_task, request.endpoint)
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Schema indexing started for {request.endpoint}.",
+                },
+            )
 
     try:
         linking_result = await asyncio.to_thread(
