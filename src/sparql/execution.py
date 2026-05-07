@@ -76,7 +76,7 @@ def format_results(results_json: dict[str, Any]) -> str:
 
 async def execute_and_format(
     query: str,
-    endpoint_url: str = SPARQL_ENDPOINT,
+    endpoint: str,
 ) -> str:
     """
     Execute query and return formatted results string.
@@ -88,5 +88,5 @@ async def execute_and_format(
     Returns:
         Formatted results string
     """
-    results = await execute_query(query, endpoint_url)
+    results = await execute_query(query, endpoint_url=endpoint)
     return format_results(results)

@@ -8,6 +8,7 @@ from api.routes import indexing, sparql, linking
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+import sys
 
 from src.sparql.llm import http_client
 from src.sparql.execution import sparql_client
@@ -16,6 +17,13 @@ from src.indexing.chroma_storage import is_endpoint_indexed
 from api.routes.indexing import managed_indexing_task
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,  # Forces it to show INFO and DEBUG messages
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Forces the output to your terminal
+    ],
+)
 
 
 # safely close the global HTTP connection pool on server shutdown
