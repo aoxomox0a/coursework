@@ -138,9 +138,6 @@ async def run_sparql_pipeline(
 
     logger.info("Generated query:\n%s", generated_query)
 
-    # Step 2: Validate — one retry with fix prompt
-    is_valid, error_msg = validation.is_valid_sparql(generated_query)
-
     if not is_valid:
         logger.warning(
             "SPARQL validation failed (%s) — retrying with fix prompt", error_msg
