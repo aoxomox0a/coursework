@@ -2058,6 +2058,7 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "spacy" },
     { name = "spacy-transformers" },
+    { name = "tqdm" },
     { name = "uvicorn" },
 ]
 
@@ -2089,6 +2090,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = "==2.6.1" },
     { name = "spacy", specifier = ">=3.8.13" },
     { name = "spacy-transformers", specifier = ">=1.4.0" },
+    { name = "tqdm", specifier = ">=4.67.3" },
     { name = "uvicorn", specifier = "==0.24.0" },
 ]
 

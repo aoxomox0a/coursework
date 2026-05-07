@@ -19,8 +19,15 @@ def _load_profile_or_none(endpoint: str):
     try:
         from src.kg_profiles import profile_from_index
 
-        return profile_from_index(endpoint)
-    except Exception as exc:
+        return profile_from_index(get_endpoint())
+    except FileNotFoundError:
+        logger.info(
+            "No persisted KG profile for the current endpoint — using legacy prompt"
+        )
+        return None
+    except (
+        Exception
+    ) as exc:  # defensive: never fail the SPARQL pipeline on a profile issue
         logger.warning("Failed to load KG profile (%s) — using legacy prompt", exc)
         return None
 
@@ -30,6 +37,45 @@ class SparqlPipelineResult(TypedDict):
     answer: str
     sparql_query: str
     error_message: str | None
+
+
+def get_required_prefixes(query_text: str) -> str:
+    """
+    Prepends standard Wikidata and DBpedia prefixes only if they are used
+    in the query logic but haven't been explicitly defined yet.
+    """
+    prefixes = ""
+
+    # --- Wikidata logic ---
+    if "wd:" in query_text and "PREFIX wd:" not in query_text:
+        prefixes += "PREFIX wd: <http://www.wikidata.org/entity/>\n"
+
+    if "wdt:" in query_text and "PREFIX wdt:" not in query_text:
+        prefixes += "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
+
+    if "p:" in query_text and "PREFIX p:" not in query_text:
+        prefixes += "PREFIX p: <http://www.wikidata.org/prop/>\n"
+
+    if "ps:" in query_text and "PREFIX ps:" not in query_text:
+        prefixes += "PREFIX ps: <http://www.wikidata.org/prop/statement/>\n"
+
+    if "pq:" in query_text and "PREFIX pq:" not in query_text:
+        prefixes += "PREFIX pq: <http://www.wikidata.org/prop/qualifier/>\n"
+
+    # --- DBpedia logic ---
+    if "dbo:" in query_text and "PREFIX dbo:" not in query_text:
+        prefixes += "PREFIX dbo: <http://dbpedia.org/ontology/>\n"
+
+    if "dbr:" in query_text and "PREFIX dbr:" not in query_text:
+        prefixes += "PREFIX dbr: <http://dbpedia.org/resource/>\n"
+
+    if "dbp:" in query_text and "PREFIX dbp:" not in query_text:
+        prefixes += "PREFIX dbp: <http://dbpedia.org/property/>\n"
+
+    if "res:" in query_text and "PREFIX res:" not in query_text:
+        prefixes += "PREFIX res: <http://dbpedia.org/resource/>\n"
+
+    return prefixes
 
 
 async def run_sparql_pipeline(
@@ -83,10 +129,12 @@ async def run_sparql_pipeline(
 
     raw_response = await llm.call_llm(sparql_prompt)
     generated_query = llm.extract_sparql_from_response(raw_response)
-    logger.info("Generated query:\n%s", generated_query)
 
-    # Step 2: Validate — one retry with fix prompt
+    # prepend prefixes
+    generated_query = get_required_prefixes(generated_query) + generated_query
     is_valid, error_msg = validation.is_valid_sparql(generated_query)
+
+    logger.info("Generated query:\n%s", generated_query)
 
     if not is_valid:
         logger.warning(

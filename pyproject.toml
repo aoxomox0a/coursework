@@ -23,6 +23,7 @@ dependencies = [
     "sacrebleu>=2.6.0",
     "evaluate>=0.4.6",
     "rank-bm25>=0.2.2",
+    "tqdm>=4.67.3",
 ]
 
 [tool.uv.sources]
