@@ -381,7 +381,7 @@
 
 .indexLineContainer {
     display: grid;
-    grid-template-columns: 1fr 100px;
+    grid-template-columns: 1fr 100px 120px 50px;
     gap: 16px;
     align-items: flex-end;
 }
@@ -434,7 +434,6 @@
     color: white;
     flex: 1;
     position: relative;
-    padding: 12px 24px;
 }
 
 .indexBtn:hover:not(:disabled) {
@@ -485,6 +484,7 @@
         transform: rotate(360deg);
     }
 }
+
 
 .skeleton {
     animation: spin 1s linear infinite;
@@ -650,8 +650,8 @@
     }
 
     .title {
-        font-size: 28px;
-        margin-bottom: 24px;
+        font-size: 20px;
+        margin-bottom: 0px;
     }
 
     .cardHeader {

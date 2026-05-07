@@ -326,7 +326,7 @@ export default function QueryTranslator() {
                             <h1 className={styles.title} style={{ fontFamily: "Courier New, Consolas, Monaco, monospace" }}>
                                 SPARQL
                             </h1>
-                            <h1 className={styles.title}>conversion</h1>
+                            <h1 className={styles.title}>Conversion</h1>
                         </div>
                         <div className={styles.section}>
                             <div className={styles.indexLineContainer}>
@@ -392,6 +392,20 @@ export default function QueryTranslator() {
                                         "Index"
                                     )}
                                 </button>
+                                <button
+                                    onClick={checkIndexStatus.bind(null, currentEndpoint)}
+                                    className={`${styles.button}`}
+                                    disabled={isIndexing}
+                                    title={"Check indexing status"}
+                                >
+                                    {isIndexing ? (
+                                        <span className={styles.skeleton}>
+                                            <img src="/refresh.png" alt="Check indexing status" style={{ width: "16px", height: "16px" }} />
+                                        </span>
+                                    ) : (
+                                        <img src="/refresh.png" alt="Check indexing status" style={{ width: "16px", height: "16px" }} />
+                                    )}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -429,15 +443,17 @@ export default function QueryTranslator() {
                         <div className={styles.responseCard}>
                             <div className={styles.chatheader}>Natural Language Answer</div>
                             <div className={styles.chatText}>
-                                {nlAnswer === "" ? (
-                                    answerError === "" ? (
-                                        <p>"Answer will appear here..." </p>
+                                <p>
+                                    {nlAnswer === "" ? (
+                                        answerError === "" ? (
+                                            "Answer will appear here..."
+                                        ) : (
+                                            <p className={styles.error}>✗ {answerError}</p>
+                                        )
                                     ) : (
-                                        <p className={styles.error}>✗ {answerError}</p>
-                                    )
-                                ) : (
-                                    nlAnswer
-                                )}
+                                        nlAnswer
+                                    )}
+                                </p>
                             </div>
                         </div>
                     </div>
