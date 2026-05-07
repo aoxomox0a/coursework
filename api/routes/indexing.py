@@ -66,7 +66,7 @@ def trigger_indexing(request: IndexRequest, background_tasks: BackgroundTasks):
     """
     print(f"\n🔍 [/api/index] Endpoint: {request.endpoint}")
     
-    if chroma_storage.is_endpoint_indexed(request.endpoint):
+    if chroma_storage.is_endpoint_indexed_count(request.endpoint) > 0:
         print(f"♻️  [/api/index] Endpoint already indexed - deleting old data and re-indexing...")
         chroma_storage.delete_endpoint_index(request.endpoint)
 
@@ -101,13 +101,15 @@ def check_indexed(request: IndexRequest):
     Returns:
         Status and indexing info
     """
-    is_indexed = chroma_storage.is_endpoint_indexed(request.endpoint)
+    indexed = chroma_storage.is_endpoint_indexed_count(request.endpoint)
     return {
         "status": "success",
         "endpoint": request.endpoint,
-        "is_indexed": is_indexed,
-        "message": "Indexed" if is_indexed else "Not indexed"
+        "is_indexed": indexed > 0,
+        "count": indexed,
+        "message": f"Indexed ({indexed} items)" if indexed else "Not indexed"
     }
+
 
 
 @router.get("/status/stream")

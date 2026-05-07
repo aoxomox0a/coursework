@@ -41,7 +41,7 @@ export default function QueryTranslator() {
     const [indexMessage, setIndexMessage] = useState("");
     const [showDropdown, setShowDropdown] = useState(false);
     const [entityLimit, setEntityLimit] = useState("10000");
-
+    const [checkedProperties, setCheckedProperties] = useState(0);
     const [nlQuery, setNlQuery] = useState("");
     const [sparqlQuery, setSparqlQuery] = useState("");
     const [isTranslating, setIsTranslating] = useState(false);
@@ -127,7 +127,9 @@ export default function QueryTranslator() {
             if (response.data.is_indexed) {
                 setIndexStatus("indexed");
                 setIndexMessage("✓ Indexed");
-                console.log(`✅ Endpoint ${url} is indexed`);
+                setCheckedProperties(response.data.count || "N/A");
+                setCurrentEndpoint(url);
+                console.log(`✅ Endpoint ${url} is indexed with ${response.data.count || "N/A"} entities`);
             } else {
                 setIndexStatus("not-indexed");
                 setIndexMessage("Not indexed");
@@ -382,7 +384,6 @@ export default function QueryTranslator() {
                                         onChange={(e) => setEntityLimit(e.target.value)}
                                         placeholder="10000"
                                         className={styles.entityLimitInput}
-                                        disabled={isIndexing || indexStatus === "indexed"}
                                         min="1"
                                     />
                                 </div>
@@ -409,14 +410,11 @@ export default function QueryTranslator() {
                                     disabled={isIndexing}
                                     title={"Check indexing status"}
                                 >
-                                    {isIndexing ? (
-                                        <span className={styles.skeleton}>
-                                            <img src="/refresh.png" alt="Check indexing status" style={{ width: "16px", height: "16px" }} />
-                                        </span>
-                                    ) : (
-                                        <img src="/refresh.png" alt="Check indexing status" style={{ width: "16px", height: "16px" }} />
-                                    )}
+                                    <img src="/refresh.png" alt="Check indexing status" style={{ width: "16px", height: "16px" }} />
                                 </button>
+                                {indexStatus === "indexed" ? (
+                                    <p style={{ color: "white", fontSize: "10px" }}>Indexed Properties : {checkedProperties}</p>
+                                ) : null}
                             </div>
                         </div>
                     </div>

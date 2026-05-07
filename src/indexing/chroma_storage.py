@@ -58,7 +58,7 @@ def get_endpoint_slug(endpoint: str) -> str:
     return domain.split(".")[0]
 
 
-def get_collection_name(base_name: str, endpoint: str = None) -> str:
+def get_collection_name(base_name: str, endpoint: str = "") -> str:
     """
     Generate endpoint-specific collection name.
 
@@ -82,8 +82,7 @@ def initialize_chromadb() -> chromadb.PersistentClient:
     print("✓ ChromaDB initialized")
     return client
 
-
-def is_endpoint_indexed(endpoint: str = None) -> bool:
+def is_endpoint_indexed_count(endpoint: str = "") -> int:
     """
     Check whether the given endpoint has already been indexed.
 
@@ -94,7 +93,7 @@ def is_endpoint_indexed(endpoint: str = None) -> bool:
         endpoint: SPARQL endpoint URL (None → default collection names)
 
     Returns:
-        True if the endpoint has been indexed and the collection is non-empty.
+        count: The number of items in the indexed collection.
     """
     try:
         client = _get_client()
@@ -103,19 +102,18 @@ def is_endpoint_indexed(endpoint: str = None) -> bool:
         
         if props_name not in existing:
             print(f"  📭 Collection '{props_name}' does not exist - not indexed yet")
-            return False
+            return 0
         
         collection = client.get_collection(name=props_name)
         count = collection.count()
         print(f"  📊 Collection '{props_name}' exists with {count} items")
         
-        result = count > 0
-        print(f"  → is_indexed: {result}")
+        result = count
+        print(f"  → is_indexed: {result > 0}")
         return result
     except Exception as e:
         print(f"  ⚠️  Error checking if indexed: {e}")
         return False
-
 
 def delete_endpoint_index(endpoint: str) -> bool:
     """
@@ -155,7 +153,7 @@ def delete_endpoint_index(endpoint: str) -> bool:
         return False
 
 
-def get_indexed_count(collection_name: str = "entities", endpoint: str = None) -> int:
+def get_indexed_count(collection_name: str = "entities", endpoint: str = "") -> int:
     """
     Get the count of entities already indexed in ChromaDB.
 
@@ -189,7 +187,7 @@ def get_indexed_count(collection_name: str = "entities", endpoint: str = None) -
         return 0
 
 
-def get_all_collection_counts(endpoint: str = None) -> dict:
+def get_all_collection_counts(endpoint: str = "") -> dict:
     """
     Get counts from all collections in ChromaDB for a specific endpoint.
 
@@ -218,7 +216,7 @@ def get_all_collection_counts(endpoint: str = None) -> dict:
 
 
 def store_entities_in_chroma(
-    entities: list, collection_name: str = "entities", endpoint: str = None
+    entities: list, collection_name: str = "entities", endpoint: str = ""
 ):
     """
     Store embedded entities in ChromaDB.
@@ -277,7 +275,7 @@ def store_entities_in_chroma(
 def query_entities_in_chroma(
     query_text: str,
     collection_name: str = "entities",
-    endpoint: str = None,
+    endpoint: str = "",
     top_k: int = 5,
 ):
     """
@@ -340,7 +338,7 @@ def _dense_query(
 def query_candidates(
     query_text: str,
     collection_name: str,
-    endpoint: str = None,
+    endpoint: str = "",
     top_k: int = 5,
     hybrid: bool = True,
 ) -> list[dict]:

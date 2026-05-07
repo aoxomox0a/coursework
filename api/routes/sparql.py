@@ -6,12 +6,13 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+from httpcore import request
 from pydantic import BaseModel, Field
 from config.settings import SPARQL_ENDPOINT
 from src.sparql.pipeline import run_sparql_pipeline
 from src.linking.pipeline import run_linking_pipeline
 from api.routes.indexing import managed_indexing_task
-from src.indexing.chroma_storage import is_endpoint_indexed
+from src.indexing.chroma_storage import is_endpoint_indexed_count
 from src.indexing.indexing_state import (
     is_indexing_in_progress,
 )
@@ -81,8 +82,7 @@ async def generate_sparql(
     Returns:
         GenerateSparqlResponse with status, question, and SPARQL query
     """
-    if not is_endpoint_indexed(request.endpoint):
-        # Fix the missing parens bug your teammate mentioned
+    if is_endpoint_indexed_count(request.endpoint) == 0:
         if is_indexing_in_progress():
             return JSONResponse(
                 status_code=202,
@@ -147,8 +147,7 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
     Returns:
         AnswerResponse with status, question, answer, and optional error
     """
-    if not is_endpoint_indexed(request.endpoint):
-        # Fix the missing parens bug your teammate mentioned
+    if is_endpoint_indexed_count(request.endpoint) == 0:
         if is_indexing_in_progress():
             return JSONResponse(
                 status_code=202,
