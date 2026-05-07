@@ -132,13 +132,25 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
         AnswerResponse with status, question, answer, and optional error
     """
     if not is_endpoint_indexed(request.endpoint):
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "error",
-                "message": f"Index missing for {request.endpoint}",
-            },
-        )
+        # Fix the missing parens bug your teammate mentioned
+        if is_indexing_in_progress():
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Indexing for {request.endpoint} is already in progress.",
+                },
+            )
+        else:
+            # Trigger the background task and return 202
+            background_tasks.add_task(managed_indexing_task, request.endpoint)
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "indexing",
+                    "message": f"Schema indexing started for {request.endpoint}.",
+                },
+            )
 
     try:
         linking_result = await asyncio.to_thread(
