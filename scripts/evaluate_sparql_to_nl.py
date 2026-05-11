@@ -30,15 +30,19 @@ from typing import Optional
 
 import httpx
 import evaluate
-from tqdm.asyncio import tqdm
+from tqdm.asyncio import tqdm_asyncio
 from datasets import load_dataset
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+from src.sparql.llm import call_llm
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("evaluate_sparql_to_nl")
 
 # Configuration
-GENERATE_NL_ENDPOINT = "http://localhost:8000/api/sparql/generate-nl"
+GENERATE_NL_ENDPOINT = "http://localhost:8000/api/generate-nl"
 CONCURRENCY_LIMIT = 10
 TEST_RANGE = 50  # Number of queries to evaluate
 LOG_DIR = Path("logs")
@@ -48,6 +52,13 @@ SUMMARY_FILE = LOG_DIR / "sparql_to_nl_summary.json"
 # Load metrics once
 bleu_metric = evaluate.load("sacrebleu")
 rouge_metric = evaluate.load("rouge")
+
+# Load embedding model for semantic similarity
+try:
+    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+except Exception as exc:
+    logger.warning(f"Failed to load embedding model: {exc}. Semantic similarity will be disabled.")
+    embedding_model = None
 
 
 @dataclass
@@ -89,6 +100,33 @@ def canonicalize_nl(text: str) -> str:
     return text
 
 
+def compute_semantic_similarity(generated: str, gold: str) -> Optional[float]:
+    """
+    Compute semantic similarity between generated and gold questions using embeddings.
+    
+    Args:
+        generated: Generated natural language question
+        gold: Gold natural language question
+    
+    Returns:
+        Cosine similarity score (0-1), or None if computation fails
+    """
+    if not embedding_model or not generated or not gold:
+        return None
+    
+    try:
+        # Compute embeddings
+        gen_embedding = embedding_model.encode(generated, convert_to_tensor=False)
+        gold_embedding = embedding_model.encode(gold, convert_to_tensor=False)
+        
+        # Compute cosine similarity
+        similarity = cosine_similarity([gen_embedding], [gold_embedding])[0][0]
+        return float(similarity)
+    except Exception as exc:
+        logger.warning(f"Semantic similarity computation error: {str(exc)[:100]}")
+        return None
+
+
 def compute_metrics(
     generated: str,
     gold: str,
@@ -101,13 +139,14 @@ def compute_metrics(
         gold: Gold natural language question
     
     Returns:
-        Dictionary with BLEU, ROUGE scores
+        Dictionary with BLEU, ROUGE, and semantic similarity scores
     """
     metrics = {
         "bleu": None,
         "rouge1": None,
         "rouge2": None,
         "rougeL": None,
+        "semantic_similarity": None,
     }
     
     if not generated or not gold:
@@ -136,6 +175,9 @@ def compute_metrics(
         metrics["rouge1"] = rouge_result.get("rouge1", 0.0)
         metrics["rouge2"] = rouge_result.get("rouge2", 0.0)
         metrics["rougeL"] = rouge_result.get("rougeL", 0.0)
+        
+        # Compute semantic similarity (on original, non-canonicalized text)
+        metrics["semantic_similarity"] = compute_semantic_similarity(generated, gold)
         
     except Exception as exc:
         logger.warning(f"Metric computation error: {str(exc)[:100]}")
@@ -192,25 +234,77 @@ def create_judge_prompt(gold_sparql: str, generated_question: str, gold_question
         generated_question: Generated natural language question
         gold_question: Gold natural language question (for reference)
     
-    Returns:
-        Judge prompt string
+    Return only valid JSON:
+        {
+            "verdict": "correct | partial | incorrect",
+            "faithfulness_score": 0.0,
+            "error_type": "none | missing_constraint | hallucination | wrong_relation | too_vague | wrong_intent",
+            "explanation": "..."
+        }
     """
-    prompt = f"""Evaluate how well this generated natural language question represents the given SPARQL query.
+    prompt = f"""
+        You are evaluating the quality of a SPARQL-to-Natural-Language generation system.
 
-SPARQL Query:
-{gold_sparql}
+        Your task is to determine whether the generated natural language question faithfully represents the meaning of the SPARQL query.
 
-Gold Reference Question:
-{gold_question}
+        You will receive:
+        1. A SPARQL query
+        2. A gold/reference natural language question
+        3. A generated natural language question
 
-Generated Question:
-{generated_question}
+        Evaluation criteria:
+        - Check whether the generated question preserves the intent and semantics of the SPARQL query.
+        - Be tolerant of paraphrasing and wording differences.
+        - Focus on:
+            - entities
+            - relations
+            - filters
+            - constraints
+            - aggregations
+            - sorting
+            - query intent
+        - Penalize:
+            - hallucinated information
+            - missing constraints
+            - incorrect entities or relations
+            - changed meaning
+            - overly vague interpretations
 
-Assess semantic faithfulness: Does the generated question accurately capture what the SPARQL query does?
+        Verdict definitions:
+        - "correct":
+        The generated question accurately represents the SPARQL query semantics.
 
-Provide your judgment as: CORRECT (question accurately represents the query), PARTIAL (some aspects are correct but may be incomplete or have minor issues), or INCORRECT (question misrepresents the query's intent).
+        - "partial":
+        The generated question is mostly correct but misses some constraints/details or contains minor semantic inaccuracies.
 
-Judgment:"""
+        - "incorrect":
+        The generated question significantly misrepresents the SPARQL query or changes its meaning.
+
+        Return ONLY valid JSON.
+        Do not include markdown fences or explanations outside JSON.
+
+        Required JSON schema:
+        {{
+            "verdict": "correct | partial | incorrect",
+            "faithfulness_score": 0.0,
+            "error_type": "none | missing_constraint | hallucination | wrong_relation | wrong_entity | too_vague | wrong_intent",
+            "explanation": "short explanation"
+        }}
+
+        Scoring guidelines:
+        - 1.0 = perfectly faithful
+        - 0.7-0.9 = mostly faithful with small issues
+        - 0.4-0.6 = partially correct
+        - 0.0-0.3 = incorrect or misleading
+
+        SPARQL QUERY:
+        {gold_sparql}
+
+        GOLD QUESTION:
+        {gold_question}
+
+        GENERATED QUESTION:
+        {generated_question}"""
     return prompt
 
 
@@ -240,16 +334,22 @@ async def evaluate_with_judge(gold_sparql: str, generated_question: str, gold_qu
             judge_result["judge_error"] = "LLM returned empty response"
             return judge_result
         
+        parsed = json.loads(response.strip())
+
         judge_result["raw_response"] = response.strip()
+        judge_result["judge_verdict"] = parsed.get("verdict")
+        judge_result["faithfulness_score"] = parsed.get("faithfulness_score")
+        judge_result["error_type"] = parsed.get("error_type")
+        judge_result["explanation"] = parsed.get("explanation")
         
-        # Parse verdict from response
+        # Parse verdict from response (check INCORRECT before CORRECT to avoid false matches)
         response_upper = response.upper()
-        if "CORRECT" in response_upper:
-            judge_result["judge_verdict"] = "correct"
+        if "INCORRECT" in response_upper:
+            judge_result["judge_verdict"] = "incorrect"
         elif "PARTIAL" in response_upper:
             judge_result["judge_verdict"] = "partial"
-        elif "INCORRECT" in response_upper:
-            judge_result["judge_verdict"] = "incorrect"
+        elif "CORRECT" in response_upper:
+            judge_result["judge_verdict"] = "correct"
         else:
             judge_result["judge_verdict"] = "unknown"
             
@@ -288,7 +388,14 @@ async def process_single_sample(
                 result = response.json()
                 
                 if result.get("status") == "success":
-                    generated_question = result.get("question", "").strip()
+                    generated_question = (
+                        result.get("question")
+                        or result.get("natural_language")
+                        or result.get("generated_question")
+                        or result.get("response")
+                        or result.get("text")
+                        or ""
+                    ).strip()
                     if not generated_question:
                         generation_error = "LLM returned empty question"
                         logger.warning(f"Sample {sample_id}: {generation_error}")
@@ -322,6 +429,7 @@ async def process_single_sample(
             rouge1_score = metrics["rouge1"]
             rouge2_score = metrics["rouge2"]
             rougeL_score = metrics["rougeL"]
+            semantic_similarity = metrics["semantic_similarity"]
         
         # LLM judge evaluation (optional, if enabled)
         judge_score = None
@@ -372,7 +480,7 @@ async def run_evaluation(
     ]
     
     logger.info("Starting evaluation...")
-    results = await tqdm.gather(*tasks, desc="Processing samples")
+    results = await tqdm_asyncio.gather(*tasks, desc="Processing samples")
     
     return results
 
@@ -418,11 +526,13 @@ def save_evaluation_results(results: list[SampleResult]) -> None:
     rouge1_scores = [r.rouge1_score for r in valid_results if r.rouge1_score is not None]
     rouge2_scores = [r.rouge2_score for r in valid_results if r.rouge2_score is not None]
     rougeL_scores = [r.rougeL_score for r in valid_results if r.rougeL_score is not None]
+    semantic_similarity_scores = [r.semantic_similarity for r in valid_results if r.semantic_similarity is not None]
     
     bleu_avg = sum(bleu_scores) / len(bleu_scores) if bleu_scores else None
     rouge1_avg = sum(rouge1_scores) / len(rouge1_scores) if rouge1_scores else None
     rouge2_avg = sum(rouge2_scores) / len(rouge2_scores) if rouge2_scores else None
     rougeL_avg = sum(rougeL_scores) / len(rougeL_scores) if rougeL_scores else None
+    semantic_similarity_avg = sum(semantic_similarity_scores) / len(semantic_similarity_scores) if semantic_similarity_scores else None
     
     # Compute judge statistics
     judge_results = [r.judge_score for r in valid_results if r.judge_score is not None]
@@ -472,8 +582,8 @@ def save_evaluation_results(results: list[SampleResult]) -> None:
                 },
             },
             "semantic_similarity": {
-                "average": None,  # Not computed yet
-                "count": 0,
+                "average": semantic_similarity_avg,
+                "count": len(semantic_similarity_scores),
             },
         },
         "judge": judge_verdicts if judge_verdicts else None,
@@ -531,6 +641,13 @@ def print_summary(results: list[SampleResult]) -> None:
             print(f"  ROUGE-2:                {sum(rouge2_scores)/len(rouge2_scores):.4f}")
         if rougeL_scores:
             print(f"  ROUGE-L:                {sum(rougeL_scores)/len(rougeL_scores):.4f}")
+        
+        # Semantic similarity (if available)
+        semantic_sim_scores = [r.semantic_similarity for r in valid_results if r.semantic_similarity is not None]
+        if semantic_sim_scores:
+            print()
+            print("Semantic Similarity (Embedding-based):")
+            print(f"  Average cosine similarity:  {sum(semantic_sim_scores)/len(semantic_sim_scores):.4f}")
         
         # Judge statistics (if any)
         judge_results = [r.judge_score for r in valid_results if r.judge_score is not None]
