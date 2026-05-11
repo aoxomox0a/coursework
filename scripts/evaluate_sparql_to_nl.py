@@ -27,6 +27,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Optional
 
+import httpx
 from tqdm.asyncio import tqdm
 from datasets import load_dataset
 
@@ -35,6 +36,7 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("evaluate_sparql_to_nl")
 
 # Configuration
+GENERATE_NL_ENDPOINT = "http://localhost:8000/api/sparql/generate-nl"
 CONCURRENCY_LIMIT = 10
 TEST_RANGE = 50  # Number of queries to evaluate
 LOG_DIR = Path("logs")
@@ -107,22 +109,50 @@ async def process_single_sample(
     """
     Process a single SPARQL→NL sample.
     
-    Placeholder for actual implementation.
+    Commit 2: Call /generate-nl endpoint to generate NL from SPARQL.
     Future commits will add:
-    1. LLM explanation generation
-    2. Metric computation (BLEU, ROUGE, semantic similarity)
-    3. LLM judge scoring
+    - Metric computation (BLEU, ROUGE, semantic similarity)
+    - LLM judge scoring
     """
     async with semaphore:
         sample_id = sample["sample_id"]
         gold_sparql = sample["gold_sparql"]
         gold_question = sample["gold_question"]
         
-        # TODO: Commit 2 — Generate NL from SPARQL
+        # Step 1: Generate NL from SPARQL via /generate-nl endpoint
         generated_question = None
         generation_error = None
         
-        # TODO: Commit 3 — Compute metrics
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    GENERATE_NL_ENDPOINT,
+                    json={"sparql_query": gold_sparql},
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                if result.get("status") == "success":
+                    generated_question = result.get("question", "").strip()
+                    if not generated_question:
+                        generation_error = "LLM returned empty question"
+                        logger.warning(f"Sample {sample_id}: {generation_error}")
+                else:
+                    generation_error = result.get("error", "Unknown API error")
+                    logger.warning(f"Sample {sample_id}: {generation_error}")
+                    
+        except httpx.TimeoutException:
+            generation_error = "API timeout"
+            logger.warning(f"Sample {sample_id}: {generation_error}")
+        except httpx.HTTPError as exc:
+            generation_error = f"HTTP error: {str(exc)[:100]}"
+            logger.warning(f"Sample {sample_id}: {generation_error}")
+        except Exception as exc:
+            generation_error = f"Error: {type(exc).__name__}: {str(exc)[:100]}"
+            logger.warning(f"Sample {sample_id}: {generation_error}")
+        
+        # TODO: Commit 3 — Compute metrics (BLEU, ROUGE, semantic similarity)
         bleu_score = None
         rouge1_score = None
         rouge2_score = None
@@ -250,19 +280,34 @@ def print_summary(results: list[SampleResult]) -> None:
     valid_results = [r for r in results if r.is_valid]
     total = len(results)
     valid_count = len(valid_results)
+    failed_count = total - valid_count
     
     print("\n" + "=" * 60)
     print("SPARQL → NL EVALUATION SUMMARY")
     print("=" * 60)
-    print(f"Total samples:    {total}")
-    print(f"Valid generation: {valid_count}/{total} ({100*valid_count/total:.1f}%)")
-    print(f"Failed:           {total - valid_count}")
+    print(f"Total samples:              {total}")
+    print(f"Successfully generated:     {valid_count}/{total} ({100*valid_count/total:.1f}%)")
+    print(f"Generation failed:          {failed_count}")
     print()
-    print("Metrics (to be populated in later commits):")
-    print(f"  BLEU:                   TBD")
-    print(f"  ROUGE-1/2/L:            TBD")
-    print(f"  Semantic Similarity:    TBD")
-    print(f"  LLM Judge (optional):   TBD")
+    
+    # Group errors by type
+    error_types = {}
+    for r in results:
+        if r.generation_error:
+            error_msg = r.generation_error.split(":")[0]
+            error_types[error_msg] = error_types.get(error_msg, 0) + 1
+    
+    if error_types:
+        print("Error breakdown:")
+        for error_type, count in sorted(error_types.items(), key=lambda x: -x[1]):
+            print(f"  {error_type}: {count}")
+        print()
+    
+    print("Metrics (to be populated in Commits 3-4):")
+    print(f"  BLEU score:             (Commit 3)")
+    print(f"  ROUGE-1/2/L:            (Commit 3)")
+    print(f"  Semantic Similarity:    (Commit 3)")
+    print(f"  LLM Judge Faithfulness: (Commit 4)")
     print("=" * 60)
 
 
