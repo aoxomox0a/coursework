@@ -19,6 +19,7 @@ import os
 import json
 import logging
 import argparse
+import re
 from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -28,6 +29,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import httpx
+import evaluate
 from tqdm.asyncio import tqdm
 from datasets import load_dataset
 
@@ -42,6 +44,10 @@ TEST_RANGE = 50  # Number of queries to evaluate
 LOG_DIR = Path("logs")
 EVAL_LOG_FILE = LOG_DIR / "sparql_to_nl_eval.jsonl"
 SUMMARY_FILE = LOG_DIR / "sparql_to_nl_summary.json"
+
+# Load metrics once
+bleu_metric = evaluate.load("sacrebleu")
+rouge_metric = evaluate.load("rouge")
 
 
 @dataclass
@@ -61,7 +67,80 @@ class SampleResult:
     is_valid: bool
 
 
-def load_lc_quad_reversed(split: str = "test", limit: Optional[int] = None) -> list[dict]:
+def canonicalize_nl(text: str) -> str:
+    """
+    Canonicalize natural language text for fair metric comparison.
+    - Lowercase
+    - Remove punctuation
+    - Normalize whitespace
+    """
+    if not text:
+        return ""
+    
+    # Lowercase
+    text = text.lower()
+    
+    # Remove punctuation
+    text = re.sub(r"[^a-z0-9\s]", "", text)
+    
+    # Normalize whitespace
+    text = " ".join(text.split())
+    
+    return text
+
+
+def compute_metrics(
+    generated: str,
+    gold: str,
+) -> dict:
+    """
+    Compute lexical and semantic metrics for SPARQL→NL evaluation.
+    
+    Args:
+        generated: Generated natural language question
+        gold: Gold natural language question
+    
+    Returns:
+        Dictionary with BLEU, ROUGE scores
+    """
+    metrics = {
+        "bleu": None,
+        "rouge1": None,
+        "rouge2": None,
+        "rougeL": None,
+    }
+    
+    if not generated or not gold:
+        return metrics
+    
+    try:
+        # Canonicalize both texts
+        gen_canonical = canonicalize_nl(generated)
+        gold_canonical = canonicalize_nl(gold)
+        
+        if not gen_canonical or not gold_canonical:
+            return metrics
+        
+        # Compute BLEU
+        bleu_result = bleu_metric.compute(
+            predictions=[gen_canonical],
+            references=[[gold_canonical]],
+        )
+        metrics["bleu"] = bleu_result.get("score", 0.0) / 100.0  # Normalize to 0-1
+        
+        # Compute ROUGE
+        rouge_result = rouge_metric.compute(
+            predictions=[gen_canonical],
+            references=[gold_canonical],
+        )
+        metrics["rouge1"] = rouge_result.get("rouge1", 0.0)
+        metrics["rouge2"] = rouge_result.get("rouge2", 0.0)
+        metrics["rougeL"] = rouge_result.get("rougeL", 0.0)
+        
+    except Exception as exc:
+        logger.warning(f"Metric computation error: {str(exc)[:100]}")
+    
+    return metrics
     """
     Load LC-QuAD dataset and reverse the mapping for SPARQL→NL evaluation.
     
@@ -110,8 +189,8 @@ async def process_single_sample(
     Process a single SPARQL→NL sample.
     
     Commit 2: Call /generate-nl endpoint to generate NL from SPARQL.
+    Commit 3: Compute BLEU, ROUGE metrics.
     Future commits will add:
-    - Metric computation (BLEU, ROUGE, semantic similarity)
     - LLM judge scoring
     """
     async with semaphore:
@@ -152,18 +231,25 @@ async def process_single_sample(
             generation_error = f"Error: {type(exc).__name__}: {str(exc)[:100]}"
             logger.warning(f"Sample {sample_id}: {generation_error}")
         
-        # TODO: Commit 3 — Compute metrics (BLEU, ROUGE, semantic similarity)
+        # Determine validity: no generation errors
+        is_valid = generation_error is None and generated_question is not None
+        
+        # Step 2 (Commit 3): Compute metrics for valid samples
         bleu_score = None
         rouge1_score = None
         rouge2_score = None
         rougeL_score = None
         semantic_similarity = None
         
+        if is_valid:
+            metrics = compute_metrics(generated_question, gold_question)
+            bleu_score = metrics["bleu"]
+            rouge1_score = metrics["rouge1"]
+            rouge2_score = metrics["rouge2"]
+            rougeL_score = metrics["rougeL"]
+        
         # TODO: Commit 4 — LLM judge (if enabled)
         judge_score = None
-        
-        # Determine validity: no generation errors
-        is_valid = generation_error is None and generated_question is not None
         
         result = SampleResult(
             sample_id=sample_id,
@@ -178,6 +264,9 @@ async def process_single_sample(
             semantic_similarity=semantic_similarity,
             judge_score=judge_score,
             is_valid=is_valid,
+        )
+        
+        return result
         )
         
         return result
@@ -283,7 +372,7 @@ def print_summary(results: list[SampleResult]) -> None:
     failed_count = total - valid_count
     
     print("\n" + "=" * 60)
-    print("SPARQL → NL EVALUATION SUMMARY")
+    print("SPARQL → NL EVALUATION SUMMARY (Commits 2-3)")
     print("=" * 60)
     print(f"Total samples:              {total}")
     print(f"Successfully generated:     {valid_count}/{total} ({100*valid_count/total:.1f}%)")
@@ -303,11 +392,26 @@ def print_summary(results: list[SampleResult]) -> None:
             print(f"  {error_type}: {count}")
         print()
     
-    print("Metrics (to be populated in Commits 3-4):")
-    print(f"  BLEU score:             (Commit 3)")
-    print(f"  ROUGE-1/2/L:            (Commit 3)")
-    print(f"  Semantic Similarity:    (Commit 3)")
-    print(f"  LLM Judge Faithfulness: (Commit 4)")
+    # Compute aggregated metrics
+    if valid_results:
+        bleu_scores = [r.bleu_score for r in valid_results if r.bleu_score is not None]
+        rouge1_scores = [r.rouge1_score for r in valid_results if r.rouge1_score is not None]
+        rouge2_scores = [r.rouge2_score for r in valid_results if r.rouge2_score is not None]
+        rougeL_scores = [r.rougeL_score for r in valid_results if r.rougeL_score is not None]
+        
+        print("Aggregated Metrics (Commit 3):")
+        if bleu_scores:
+            print(f"  BLEU:                   {sum(bleu_scores)/len(bleu_scores):.4f}")
+        if rouge1_scores:
+            print(f"  ROUGE-1:                {sum(rouge1_scores)/len(rouge1_scores):.4f}")
+        if rouge2_scores:
+            print(f"  ROUGE-2:                {sum(rouge2_scores)/len(rouge2_scores):.4f}")
+        if rougeL_scores:
+            print(f"  ROUGE-L:                {sum(rougeL_scores)/len(rougeL_scores):.4f}")
+    
+    print()
+    print("Remaining (Commit 4):")
+    print(f"  LLM Judge Faithfulness: (pending)")
     print("=" * 60)
 
 
