@@ -4,7 +4,7 @@ Evaluate SPARQL → Natural Language generation using LC-QuAD dataset in reverse
 For each sample:
   - Input: gold SPARQL query (sparql_dbpedia18)
   - Gold target: original question
-  - Model output: generated natural language question via /explain endpoint
+  - Model output: generated natural language question via /generate-nl endpoint
   - Metrics: semantic similarity, BLEU, ROUGE, optional LLM judge
 
 Usage:
