@@ -141,6 +141,9 @@ def compute_metrics(
         logger.warning(f"Metric computation error: {str(exc)[:100]}")
     
     return metrics
+
+
+def load_lc_quad_reversed(split: str = "test", limit: Optional[int] = None) -> list[dict]:
     """
     Load LC-QuAD dataset and reverse the mapping for SPARQL→NL evaluation.
     
@@ -180,18 +183,90 @@ def compute_metrics(
     return reversed_samples
 
 
+def create_judge_prompt(gold_sparql: str, generated_question: str, gold_question: str) -> str:
+    """
+    Create a prompt for LLM to evaluate faithfulness of generated question to SPARQL.
+    
+    Args:
+        gold_sparql: Original SPARQL query
+        generated_question: Generated natural language question
+        gold_question: Gold natural language question (for reference)
+    
+    Returns:
+        Judge prompt string
+    """
+    prompt = f"""Evaluate how well this generated natural language question represents the given SPARQL query.
+
+SPARQL Query:
+{gold_sparql}
+
+Gold Reference Question:
+{gold_question}
+
+Generated Question:
+{generated_question}
+
+Assess semantic faithfulness: Does the generated question accurately capture what the SPARQL query does?
+
+Provide your judgment as: CORRECT (question accurately represents the query), PARTIAL (some aspects are correct but may be incomplete or have minor issues), or INCORRECT (question misrepresents the query's intent).
+
+Judgment:"""
+    return prompt
+
+
+async def evaluate_with_judge(gold_sparql: str, generated_question: str, gold_question: str) -> dict:
+    """
+    Use LLM judge to evaluate semantic faithfulness of generated question.
+    
+    Args:
+        gold_sparql: Original SPARQL query
+        generated_question: Generated natural language question
+        gold_question: Gold natural language question
+    
+    Returns:
+        Dictionary with judge_verdict and raw_response
+    """
+    judge_result = {
+        "judge_verdict": None,
+        "raw_response": None,
+        "judge_error": None,
+    }
+    
+    try:
+        prompt = create_judge_prompt(gold_sparql, generated_question, gold_question)
+        response = await call_llm(prompt)
+        
+        if not response:
+            judge_result["judge_error"] = "LLM returned empty response"
+            return judge_result
+        
+        judge_result["raw_response"] = response.strip()
+        
+        # Parse verdict from response
+        response_upper = response.upper()
+        if "CORRECT" in response_upper:
+            judge_result["judge_verdict"] = "correct"
+        elif "PARTIAL" in response_upper:
+            judge_result["judge_verdict"] = "partial"
+        elif "INCORRECT" in response_upper:
+            judge_result["judge_verdict"] = "incorrect"
+        else:
+            judge_result["judge_verdict"] = "unknown"
+            
+    except Exception as exc:
+        judge_result["judge_error"] = f"Judge error: {type(exc).__name__}: {str(exc)[:100]}"
+        logger.warning(f"Judge evaluation failed: {judge_result['judge_error']}")
+    
+    return judge_result
+
+
 async def process_single_sample(
     sample: dict,
     semaphore: asyncio.Semaphore,
     judge_enabled: bool = False,
 ) -> SampleResult:
     """
-    Process a single SPARQL→NL sample.
-    
-    Commit 2: Call /generate-nl endpoint to generate NL from SPARQL.
-    Commit 3: Compute BLEU, ROUGE metrics.
-    Future commits will add:
-    - LLM judge scoring
+    Process a single SPARQL→NL sample and generate metrics.
     """
     async with semaphore:
         sample_id = sample["sample_id"]
@@ -234,7 +309,7 @@ async def process_single_sample(
         # Determine validity: no generation errors
         is_valid = generation_error is None and generated_question is not None
         
-        # Step 2 (Commit 3): Compute metrics for valid samples
+        # Compute metrics for valid samples
         bleu_score = None
         rouge1_score = None
         rouge2_score = None
@@ -248,8 +323,13 @@ async def process_single_sample(
             rouge2_score = metrics["rouge2"]
             rougeL_score = metrics["rougeL"]
         
-        # TODO: Commit 4 — LLM judge (if enabled)
+        # LLM judge evaluation (optional, if enabled)
         judge_score = None
+        if is_valid and judge_enabled:
+            judge_result = await evaluate_with_judge(
+                gold_sparql, generated_question, gold_question
+            )
+            judge_score = judge_result
         
         result = SampleResult(
             sample_id=sample_id,
@@ -264,9 +344,6 @@ async def process_single_sample(
             semantic_similarity=semantic_similarity,
             judge_score=judge_score,
             is_valid=is_valid,
-        )
-        
-        return result
         )
         
         return result
@@ -302,9 +379,7 @@ async def run_evaluation(
 
 def save_evaluation_results(results: list[SampleResult]) -> None:
     """
-    Save per-sample results to JSONL and summary to JSON.
-    
-    TODO: Commit 5 — Add this implementation
+    Save per-sample results to JSONL and aggregated summary to JSON.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     
@@ -332,29 +407,77 @@ def save_evaluation_results(results: list[SampleResult]) -> None:
             }
             f.write(json.dumps(result_dict) + "\n")
     
-    # Summary JSON
+    # Aggregate metrics for summary
     valid_results = [r for r in results if r.is_valid]
     total = len(results)
     valid_count = len(valid_results)
+    failed_count = total - valid_count
     
+    # Compute metric averages
+    bleu_scores = [r.bleu_score for r in valid_results if r.bleu_score is not None]
+    rouge1_scores = [r.rouge1_score for r in valid_results if r.rouge1_score is not None]
+    rouge2_scores = [r.rouge2_score for r in valid_results if r.rouge2_score is not None]
+    rougeL_scores = [r.rougeL_score for r in valid_results if r.rougeL_score is not None]
+    
+    bleu_avg = sum(bleu_scores) / len(bleu_scores) if bleu_scores else None
+    rouge1_avg = sum(rouge1_scores) / len(rouge1_scores) if rouge1_scores else None
+    rouge2_avg = sum(rouge2_scores) / len(rouge2_scores) if rouge2_scores else None
+    rougeL_avg = sum(rougeL_scores) / len(rougeL_scores) if rougeL_scores else None
+    
+    # Compute judge statistics
+    judge_results = [r.judge_score for r in valid_results if r.judge_score is not None]
+    judge_verdicts = {}
+    if judge_results:
+        verdicts = [j.get("judge_verdict") for j in judge_results]
+        judge_verdicts = {
+            "correct": verdicts.count("correct"),
+            "partial": verdicts.count("partial"),
+            "incorrect": verdicts.count("incorrect"),
+            "unknown": verdicts.count("unknown"),
+            "total_judged": len(verdicts),
+        }
+    
+    # Compute error breakdown
+    error_breakdown = {}
+    for r in results:
+        if r.generation_error:
+            error_type = r.generation_error.split(":")[0]
+            error_breakdown[error_type] = error_breakdown.get(error_type, 0) + 1
+    
+    # Build summary JSON
     summary = {
         "metadata": {
             "total_samples": total,
             "valid_samples": valid_count,
-            "failed_samples": total - valid_count,
+            "failed_samples": failed_count,
             "success_rate": valid_count / total if total > 0 else 0.0,
         },
         "metrics": {
-            "bleu": None,
-            "rouge": {
-                "rouge1": None,
-                "rouge2": None,
-                "rougeL": None,
+            "bleu": {
+                "average": bleu_avg,
+                "count": len(bleu_scores),
             },
-            "semantic_similarity": None,
-            "judge": None,
+            "rouge": {
+                "rouge1": {
+                    "average": rouge1_avg,
+                    "count": len(rouge1_scores),
+                },
+                "rouge2": {
+                    "average": rouge2_avg,
+                    "count": len(rouge2_scores),
+                },
+                "rougeL": {
+                    "average": rougeL_avg,
+                    "count": len(rougeL_scores),
+                },
+            },
+            "semantic_similarity": {
+                "average": None,  # Not computed yet
+                "count": 0,
+            },
         },
-        "error_breakdown": {},
+        "judge": judge_verdicts if judge_verdicts else None,
+        "error_breakdown": error_breakdown,
     }
     
     with open(SUMMARY_FILE, "w") as f:
@@ -371,9 +494,9 @@ def print_summary(results: list[SampleResult]) -> None:
     valid_count = len(valid_results)
     failed_count = total - valid_count
     
-    print("\n" + "=" * 60)
-    print("SPARQL → NL EVALUATION SUMMARY (Commits 2-3)")
-    print("=" * 60)
+    print("\n" + "=" * 70)
+    print("SPARQL → NL EVALUATION COMPLETE")
+    print("=" * 70)
     print(f"Total samples:              {total}")
     print(f"Successfully generated:     {valid_count}/{total} ({100*valid_count/total:.1f}%)")
     print(f"Generation failed:          {failed_count}")
@@ -399,7 +522,7 @@ def print_summary(results: list[SampleResult]) -> None:
         rouge2_scores = [r.rouge2_score for r in valid_results if r.rouge2_score is not None]
         rougeL_scores = [r.rougeL_score for r in valid_results if r.rougeL_score is not None]
         
-        print("Aggregated Metrics (Commit 3):")
+        print("Lexical Metrics:")
         if bleu_scores:
             print(f"  BLEU:                   {sum(bleu_scores)/len(bleu_scores):.4f}")
         if rouge1_scores:
@@ -408,11 +531,31 @@ def print_summary(results: list[SampleResult]) -> None:
             print(f"  ROUGE-2:                {sum(rouge2_scores)/len(rouge2_scores):.4f}")
         if rougeL_scores:
             print(f"  ROUGE-L:                {sum(rougeL_scores)/len(rougeL_scores):.4f}")
+        
+        # Judge statistics (if any)
+        judge_results = [r.judge_score for r in valid_results if r.judge_score is not None]
+        if judge_results:
+            verdicts = [j.get("judge_verdict") for j in judge_results]
+            correct_count = verdicts.count("correct")
+            partial_count = verdicts.count("partial")
+            incorrect_count = verdicts.count("incorrect")
+            unknown_count = verdicts.count("unknown")
+            
+            print()
+            print("Semantic Faithfulness (LLM Judge):")
+            print(f"  Correct:                {correct_count}/{len(verdicts)} ({100*correct_count/len(verdicts):.1f}%)")
+            if partial_count > 0:
+                print(f"  Partially Correct:      {partial_count}/{len(verdicts)} ({100*partial_count/len(verdicts):.1f}%)")
+            if incorrect_count > 0:
+                print(f"  Incorrect:              {incorrect_count}/{len(verdicts)} ({100*incorrect_count/len(verdicts):.1f}%)")
+            if unknown_count > 0:
+                print(f"  Unknown:                {unknown_count}/{len(verdicts)} ({100*unknown_count/len(verdicts):.1f}%)")
     
     print()
-    print("Remaining (Commit 4):")
-    print(f"  LLM Judge Faithfulness: (pending)")
-    print("=" * 60)
+    print("Output Files:")
+    print(f"  Per-sample:             {EVAL_LOG_FILE}")
+    print(f"  Aggregated summary:     {SUMMARY_FILE}")
+    print("=" * 70)
 
 
 async def main() -> int:
