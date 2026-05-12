@@ -2,6 +2,7 @@
 Linking Pipeline: Orchestrate entity and relation linking.
 """
 
+from config.settings import SPARQL_ENDPOINT
 from src.linking import entity_extraction, entity_linking, relation_linking, spacy_setup
 from typing import List, Dict
 import torch
@@ -11,7 +12,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def run_linking_pipeline(questions: List[str]) -> List[Dict]:
+def run_linking_pipeline(questions: List[str], endpoint: str = None) -> List[Dict]:
+    if endpoint is None:
+        from config.settings import SPARQL_ENDPOINT
+        endpoint = SPARQL_ENDPOINT
+    
     logger.debug("Starting Linking Pipeline...")
     logger.debug(f"Question: {questions}")
 

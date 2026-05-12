@@ -19,7 +19,7 @@ def _load_profile_or_none(endpoint: str):
     try:
         from src.kg_profiles import profile_from_index
 
-        return profile_from_index(get_endpoint())
+        return profile_from_index(endpoint)
     except FileNotFoundError:
         logger.info(
             "No persisted KG profile for the current endpoint — using legacy prompt"
@@ -79,7 +79,7 @@ def get_required_prefixes(query_text: str) -> str:
 
 
 async def run_sparql_pipeline(
-    question: str, linking_result: dict, endpoint=None
+    question: str, linking_result: dict, endpoint: str
 ) -> SparqlPipelineResult:
     """
     Execute the complete SPARQL generation & execution pipeline:
@@ -118,7 +118,7 @@ async def run_sparql_pipeline(
 
     # Step 1: Generate prompt and call LLM
     logger.info("Generating SPARQL prompt for: %s", question)
-    profile = _load_profile_or_none(endpoint=endpoint)
+    profile = _load_profile_or_none(endpoint)
     sparql_prompt = prompt.generate_sparql_prompt(
         question=question,
         entity_uris=entity_uris,
