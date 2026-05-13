@@ -378,7 +378,7 @@ async def process_single_sample(
         generation_error = None
         
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=300.0) as client:
                 response = await client.post(
                     GENERATE_NL_ENDPOINT,
                     json={"sparql_query": gold_sparql},

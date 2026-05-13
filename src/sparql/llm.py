@@ -53,7 +53,7 @@ async def call_llm(prompt: str, model: str | None = None) -> str:
             f"{LLM_ENDPOINT}/chat/completions",
             headers=headers,
             json=payload,
-            timeout=60,
+            timeout=300,
         )
 
         if response.status_code == 200:
