@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-API_URL="http://localhost:8000/api/explain"
+API_URL="http://localhost:8000/api/generate-nl"
 
 # create temporary file used to store json response
 RESPONSE_BODY=$(mktemp)

@@ -40,7 +40,7 @@ class AnswerResponse(BaseModel):
 
 
 class ExplainRequest(BaseModel):
-    sparql_query: str = Field(..., min_length=1, description="SPARQL query to explain")
+    sparql_query: str = Field(..., min_length=1, description="SPARQL query to convert to natural language")
 
 
 class ExplainResponse(BaseModel):
@@ -198,16 +198,16 @@ async def get_answer(request: AnswerRequest, background_tasks: BackgroundTasks):
     )
 
 
-@router.post("/explain")
-async def explain_sparql(request: ExplainRequest):
+@router.post("/generate-nl")
+async def generate_nl_from_sparql(request: ExplainRequest):
     """
-    Recover the original natural language question from a SPARQL query.
+    Generate natural language question from a SPARQL query.
 
     Args:
         request: ExplainRequest with 'sparql_query' field
 
     Returns:
-        ExplainResponse with status, sparql_query, and original question
+        ExplainResponse with status, sparql_query, and generated question
     """
     try:
         prompt = generate_sparql_explanation_prompt(request.sparql_query)

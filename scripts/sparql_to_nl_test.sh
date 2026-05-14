@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
 # Test script for SPARQL to Natural Language explanation API
-# Tests the /api/explain endpoint with various SPARQL queries
+# Tests the /api/generate-nl endpoint with various SPARQL queries
 
 # abort if error
 set -euo pipefail
 
-API_URL="http://localhost:8000/api/explain"
+API_URL="http://localhost:8000/api/generate-nl"
 
 # create temporary file used to store json response
 RESPONSE_BODY=$(mktemp)

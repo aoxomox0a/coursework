@@ -263,7 +263,7 @@ export default function QueryTranslator() {
         setNlExplanation("");
 
         try {
-            const response = await axios.post("http://localhost:8000/api/explain", {
+            const response = await axios.post("http://localhost:8000/api/generate-nl", {
                 sparql_query: sparqlInput,
             });
 

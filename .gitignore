@@ -53,6 +53,7 @@ chroma.sqlite3
 .DS_Store
 Thumbs.db
 .claude/
+logs/*
 
 # =========================
 # 6. Testing & Coverage
