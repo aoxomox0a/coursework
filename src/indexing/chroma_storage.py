@@ -114,7 +114,7 @@ def is_endpoint_indexed_count(endpoint: str = "") -> int:
         return result
     except Exception as e:
         print(f"  ⚠️  Error checking if indexed: {e}")
-        return False
+        return 0
 
 
 def delete_endpoint_index(endpoint: str) -> bool:
