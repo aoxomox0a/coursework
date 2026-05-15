@@ -82,6 +82,7 @@ def initialize_chromadb() -> chromadb.PersistentClient:
     print("✓ ChromaDB initialized")
     return client
 
+
 def is_endpoint_indexed_count(endpoint: str = "") -> int:
     """
     Check whether the given endpoint has already been indexed.
@@ -99,15 +100,15 @@ def is_endpoint_indexed_count(endpoint: str = "") -> int:
         client = _get_client()
         existing = {c.name for c in client.list_collections()}
         props_name = get_collection_name("properties", endpoint)
-        
+
         if props_name not in existing:
             print(f"  📭 Collection '{props_name}' does not exist - not indexed yet")
             return 0
-        
+
         collection = client.get_collection(name=props_name)
         count = collection.count()
         print(f"  📊 Collection '{props_name}' exists with {count} items")
-        
+
         result = count
         print(f"  → is_indexed: {result > 0}")
         return result
@@ -115,13 +116,14 @@ def is_endpoint_indexed_count(endpoint: str = "") -> int:
         print(f"  ⚠️  Error checking if indexed: {e}")
         return False
 
+
 def delete_endpoint_index(endpoint: str) -> bool:
     """
     Delete all ChromaDB collections for a specific endpoint.
-    
+
     Args:
         endpoint: SPARQL endpoint URL
-    
+
     Returns:
         True if deletion was successful, False otherwise
     """
@@ -129,12 +131,12 @@ def delete_endpoint_index(endpoint: str) -> bool:
         client = _get_client()
         collections_to_delete = [
             "entities",
-            "properties", 
+            "properties",
             "classes",
             "sample_triples",
-            "class_entity_mappings"
+            "class_entity_mappings",
         ]
-        
+
         deleted_count = 0
         for base_name in collections_to_delete:
             collection_name = get_collection_name(base_name, endpoint)
@@ -145,74 +147,12 @@ def delete_endpoint_index(endpoint: str) -> bool:
             except Exception as e:
                 # Collection might not exist, that's fine
                 pass
-        
+
         print(f"\n✓ Deleted {deleted_count} collections for endpoint: {endpoint}\n")
         return True
     except Exception as e:
         print(f"  ⚠️  Error deleting endpoint index: {e}")
         return False
-
-
-def get_indexed_count(collection_name: str = "entities", endpoint: str = "") -> int:
-    """
-    Get the count of entities already indexed in ChromaDB.
-
-    Args:
-        collection_name: Base collection name
-        endpoint: Optional endpoint URL (if provided, uses endpoint-specific collection)
-
-    Returns:
-        Count of indexed entities
-    """
-    try:
-        client = _get_client()
-
-        # Generate endpoint-specific collection name
-        final_collection_name = get_collection_name(collection_name, endpoint)
-
-        # Get all collections and check if this one exists
-        collections = client.list_collections()
-        collection_names = [c.name for c in collections]
-
-        if final_collection_name not in collection_names:
-            # Collection doesn't exist yet, silently return 0
-            return 0
-
-        collection = client.get_collection(name=final_collection_name)
-        count = collection.count()
-        return count
-    except Exception as e:
-        # Only print for actual errors, not for missing collections
-        print(f"Warning: Error getting indexed count for {collection_name}: {e}")
-        return 0
-
-
-def get_all_collection_counts(endpoint: str = "") -> dict:
-    """
-    Get counts from all collections in ChromaDB for a specific endpoint.
-
-    Args:
-        endpoint: Optional endpoint URL (if provided, gets endpoint-specific collections)
-
-    Returns:
-        Dict with collection names and their counts
-    """
-    base_collections = [
-        "entities",
-        "properties",
-        "classes",
-        "sample_triples",
-        "class_entity_mappings",
-    ]
-    counts = {}
-
-    for base_name in base_collections:
-        try:
-            counts[base_name] = get_indexed_count(base_name, endpoint=endpoint)
-        except:
-            counts[base_name] = 0
-
-    return counts
 
 
 def store_entities_in_chroma(
@@ -309,9 +249,7 @@ def query_entities_in_chroma(
 _HYBRID_POOL = 20
 
 
-def _dense_query(
-    scoped_name: str, query_text: str, n: int
-) -> list[dict]:
+def _dense_query(scoped_name: str, query_text: str, n: int) -> list[dict]:
     """Dense (Chroma) retrieval, formatted as {uri, label, score} dicts."""
     client = _get_client()
     collection = client.get_collection(name=scoped_name)
@@ -388,7 +326,26 @@ def query_candidates(
         # never regress below the pre-hybrid baseline.
         return dense_hits[:top_k]
 
-    return [
-        {"uri": h.uri, "label": h.label, "score": h.score}
-        for h in fused[:top_k]
-    ]
+    return [{"uri": h.uri, "label": h.label, "score": h.score} for h in fused[:top_k]]
+
+
+def stored_info():
+    """Check the content of the ChromaDB storage for debugging purposes."""
+    client = _get_client()
+    collections = client.list_collections()
+    stored_info = {}
+    for collection in collections:
+        print(f"Collection: {collection.name}")
+        results = collection.get(limit=100)
+        print(results.keys())
+        print(results["ids"])
+        print(results["documents"])
+        print(results["metadatas"])
+        
+        stored_info[collection.name] = {
+            "ids": results.get("ids", []),
+            "documents": results.get("documents", []),
+            "metadatas": results.get("metadatas", []),
+        }
+
+    return stored_info

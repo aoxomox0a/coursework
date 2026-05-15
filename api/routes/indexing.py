@@ -4,10 +4,11 @@ API routes for Graph Indexing
 
 import asyncio
 import json
+from urllib.parse import urlparse
 from fastapi import APIRouter, status, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from src.indexing import entities, chroma_storage
+from src.indexing import chroma_storage
 from src.indexing.pipeline import run_indexing_pipeline
 from src.indexing.indexing_state import (
     get_status,
@@ -16,7 +17,6 @@ from src.indexing.indexing_state import (
     toggle_indexing_state,
     register_sse_client,
     unregister_sse_client,
-    broadcast_status_update,
 )
 
 router = APIRouter()
@@ -156,3 +156,39 @@ async def stream_indexing_status(endpoint: str):
             print(f"📡 [SSE] Stream closed for {endpoint}")
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+
+@router.post("/check_stored")
+def check_stored_from_chroma(endpoint: str = ""):
+    """
+    Check what topics/entities are currently stored in ChromaDB
+    for a specific SPARQL endpoint domain.
+    """
+
+    stored_info = chroma_storage.stored_info()
+
+    if not stored_info:
+        return {
+            "status": "success",
+            "stored_info": {},
+            "message": "No data currently stored in ChromaDB"
+        }
+
+    # Extract domain from endpoint
+    parsed = urlparse(endpoint)
+    domain = parsed.netloc.lower()
+
+    # Filter only matching entries
+    filtered_info = {
+        key: value
+        for key, value in stored_info.items()
+        if domain in key.lower()
+    }
+
+    return {
+        "status": "success",
+        "endpoint": endpoint,
+        "domain": domain,
+        "stored_info": filtered_info
+    }

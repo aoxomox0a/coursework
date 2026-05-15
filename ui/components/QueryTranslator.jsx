@@ -50,6 +50,8 @@ export default function QueryTranslator() {
         ?x rdf:type Person ;
             foaf:name ?name
         }`);
+
+    const [jsonOutput, setJsonOutput] = useState("");
     const [nlExplanation, setNlExplanation] = useState("");
     const [isExplaining, setIsExplaining] = useState(false);
     const [explanationError, setExplanationError] = useState("");
@@ -139,6 +141,22 @@ export default function QueryTranslator() {
             setIndexStatus("error");
             setIndexMessage("Status check failed");
             console.error("Error checking index status:", error);
+        }
+    };
+
+    const checkSavedInfo = async (url) => {
+        try {
+            const response = await axios.post("http://localhost:8000/api/check_stored", {
+                endpoint: url,
+            });
+            if (response.data.status === "success") {
+                console.log("Stored info from ChromaDB:", response.data.stored_info);
+                setJsonOutput(JSON.stringify(response.data.stored_info, null, 2));
+            } else {
+                console.error("Error fetching stored info:", response.data.message);
+            }
+        } catch (error) {
+            console.error("Error checking stored info:", error);
         }
     };
 
@@ -589,6 +607,42 @@ export default function QueryTranslator() {
                             </div>
 
                             {explanationError && <div className={styles.error}>✗ {explanationError}</div>}
+                        </div>
+                    </div>
+                    <div className={styles.card}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>Check Indexed topics</h2>
+                            <button
+                                onClick={() => checkSavedInfo(currentEndpoint)}
+                                disabled={isIndexing}
+                                className={`${styles.button}`}
+                                title="Press Ctrl+Enter to run."
+                            >
+                                Run
+                            </button>
+                        </div>
+
+                        <div className={styles.section}>
+                            <div className={`${styles.monacoContainer} ${styles.jsonContainer}`}>
+                                <label className={styles.label}>Stored info</label>
+                                <Editor
+                                    defaultLanguage="json"
+                                    className={styles.textarea}
+                                    value={jsonOutput}
+                                    onChange={(value) => setJsonOutput(value || "")}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        wordWrap: "on",
+                                        fontSize: 13,
+                                    }}
+                                    theme="vs-light"
+                                    onMount={(editor, monaco) => {
+                                        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                                            checkSavedInfo();
+                                        });
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
