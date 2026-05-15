@@ -4,10 +4,11 @@ API routes for Graph Indexing
 
 import asyncio
 import json
+from urllib.parse import urlparse
 from fastapi import APIRouter, status, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from src.indexing import entities, chroma_storage
+from src.indexing import chroma_storage
 from src.indexing.pipeline import run_indexing_pipeline
 from src.indexing.indexing_state import (
     get_status,
@@ -16,7 +17,6 @@ from src.indexing.indexing_state import (
     toggle_indexing_state,
     register_sse_client,
     unregister_sse_client,
-    broadcast_status_update,
 )
 
 router = APIRouter()
@@ -66,7 +66,7 @@ def trigger_indexing(request: IndexRequest, background_tasks: BackgroundTasks):
     """
     print(f"\n🔍 [/api/index] Endpoint: {request.endpoint}")
     
-    if chroma_storage.is_endpoint_indexed(request.endpoint):
+    if chroma_storage.is_endpoint_indexed_count(request.endpoint) > 0:
         print(f"♻️  [/api/index] Endpoint already indexed - deleting old data and re-indexing...")
         chroma_storage.delete_endpoint_index(request.endpoint)
 
@@ -101,13 +101,15 @@ def check_indexed(request: IndexRequest):
     Returns:
         Status and indexing info
     """
-    is_indexed = chroma_storage.is_endpoint_indexed(request.endpoint)
+    indexed = chroma_storage.is_endpoint_indexed_count(request.endpoint)
     return {
         "status": "success",
         "endpoint": request.endpoint,
-        "is_indexed": is_indexed,
-        "message": "Indexed" if is_indexed else "Not indexed"
+        "is_indexed": indexed > 0,
+        "count": indexed,
+        "message": f"Indexed ({indexed} items)" if indexed else "Not indexed"
     }
+
 
 
 @router.get("/status/stream")
@@ -154,3 +156,39 @@ async def stream_indexing_status(endpoint: str):
             print(f"📡 [SSE] Stream closed for {endpoint}")
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+
+@router.post("/check_stored")
+def check_stored_from_chroma(endpoint: str = ""):
+    """
+    Check what topics/entities are currently stored in ChromaDB
+    for a specific SPARQL endpoint domain.
+    """
+
+    stored_info = chroma_storage.stored_info()
+
+    if not stored_info:
+        return {
+            "status": "success",
+            "stored_info": {},
+            "message": "No data currently stored in ChromaDB"
+        }
+
+    # Extract domain from endpoint
+    parsed = urlparse(endpoint)
+    domain = parsed.netloc.lower()
+
+    # Filter only matching entries
+    filtered_info = {
+        key: value
+        for key, value in stored_info.items()
+        if domain in key.lower()
+    }
+
+    return {
+        "status": "success",
+        "endpoint": endpoint,
+        "domain": domain,
+        "stored_info": filtered_info
+    }

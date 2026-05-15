@@ -41,7 +41,7 @@ export default function QueryTranslator() {
     const [indexMessage, setIndexMessage] = useState("");
     const [showDropdown, setShowDropdown] = useState(false);
     const [entityLimit, setEntityLimit] = useState("10000");
-
+    const [checkedProperties, setCheckedProperties] = useState(0);
     const [nlQuery, setNlQuery] = useState("");
     const [sparqlQuery, setSparqlQuery] = useState("");
     const [isTranslating, setIsTranslating] = useState(false);
@@ -50,6 +50,8 @@ export default function QueryTranslator() {
         ?x rdf:type Person ;
             foaf:name ?name
         }`);
+
+    const [jsonOutput, setJsonOutput] = useState("");
     const [nlExplanation, setNlExplanation] = useState("");
     const [isExplaining, setIsExplaining] = useState(false);
     const [explanationError, setExplanationError] = useState("");
@@ -127,7 +129,9 @@ export default function QueryTranslator() {
             if (response.data.is_indexed) {
                 setIndexStatus("indexed");
                 setIndexMessage("✓ Indexed");
-                console.log(`✅ Endpoint ${url} is indexed`);
+                setCheckedProperties(response.data.count || "N/A");
+                setCurrentEndpoint(url);
+                console.log(`✅ Endpoint ${url} is indexed with ${response.data.count || "N/A"} entities`);
             } else {
                 setIndexStatus("not-indexed");
                 setIndexMessage("Not indexed");
@@ -137,6 +141,22 @@ export default function QueryTranslator() {
             setIndexStatus("error");
             setIndexMessage("Status check failed");
             console.error("Error checking index status:", error);
+        }
+    };
+
+    const checkSavedInfo = async (url) => {
+        try {
+            const response = await axios.post("http://localhost:8000/api/check_stored", {
+                endpoint: url,
+            });
+            if (response.data.status === "success") {
+                console.log("Stored info from ChromaDB:", response.data.stored_info);
+                setJsonOutput(JSON.stringify(response.data.stored_info, null, 2));
+            } else {
+                console.error("Error fetching stored info:", response.data.message);
+            }
+        } catch (error) {
+            console.error("Error checking stored info:", error);
         }
     };
 
@@ -337,7 +357,7 @@ export default function QueryTranslator() {
                             <h1 className={styles.title} style={{ fontFamily: "Courier New, Consolas, Monaco, monospace" }}>
                                 SPARQL
                             </h1>
-                            <h1 className={styles.title}>conversion</h1>
+                            <h1 className={styles.title}>Conversion</h1>
                         </div>
                         <div className={styles.section}>
                             <div className={styles.indexLineContainer}>
@@ -382,7 +402,6 @@ export default function QueryTranslator() {
                                         onChange={(e) => setEntityLimit(e.target.value)}
                                         placeholder="10000"
                                         className={styles.entityLimitInput}
-                                        disabled={isIndexing || indexStatus === "indexed"}
                                         min="1"
                                     />
                                 </div>
@@ -403,6 +422,17 @@ export default function QueryTranslator() {
                                         "Index"
                                     )}
                                 </button>
+                                <button
+                                    onClick={checkIndexStatus.bind(null, currentEndpoint)}
+                                    className={`${styles.button}`}
+                                    disabled={isIndexing}
+                                    title={"Check indexing status"}
+                                >
+                                    <img src="/refresh.png" alt="Check indexing status" style={{ width: "16px", height: "16px" }} />
+                                </button>
+                                {indexStatus === "indexed" ? (
+                                    <p style={{ color: "white", fontSize: "10px" }}>Indexed Properties : {checkedProperties}</p>
+                                ) : null}
                             </div>
                         </div>
                     </div>
@@ -440,15 +470,17 @@ export default function QueryTranslator() {
                         <div className={styles.responseCard}>
                             <div className={styles.chatheader}>Natural Language Answer</div>
                             <div className={styles.chatText}>
-                                {nlAnswer === "" ? (
-                                    answerError === "" ? (
-                                        <p>"Answer will appear here..." </p>
+                                <p>
+                                    {nlAnswer === "" ? (
+                                        answerError === "" ? (
+                                            "Answer will appear here..."
+                                        ) : (
+                                            <p className={styles.error}>✗ {answerError}</p>
+                                        )
                                     ) : (
-                                        <p className={styles.error}>✗ {answerError}</p>
-                                    )
-                                ) : (
-                                    nlAnswer
-                                )}
+                                        nlAnswer
+                                    )}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -575,6 +607,42 @@ export default function QueryTranslator() {
                             </div>
 
                             {explanationError && <div className={styles.error}>✗ {explanationError}</div>}
+                        </div>
+                    </div>
+                    <div className={styles.card}>
+                        <div className={styles.cardHeader}>
+                            <h2 className={styles.cardTitle}>Check Indexed topics</h2>
+                            <button
+                                onClick={() => checkSavedInfo(currentEndpoint)}
+                                disabled={isIndexing}
+                                className={`${styles.button}`}
+                                title="Press Ctrl+Enter to run."
+                            >
+                                Run
+                            </button>
+                        </div>
+
+                        <div className={styles.section}>
+                            <div className={`${styles.monacoContainer} ${styles.jsonContainer}`}>
+                                <label className={styles.label}>Stored info</label>
+                                <Editor
+                                    defaultLanguage="json"
+                                    className={styles.textarea}
+                                    value={jsonOutput}
+                                    onChange={(value) => setJsonOutput(value || "")}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        wordWrap: "on",
+                                        fontSize: 13,
+                                    }}
+                                    theme="vs-light"
+                                    onMount={(editor, monaco) => {
+                                        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                                            checkSavedInfo();
+                                        });
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

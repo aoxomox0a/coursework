@@ -13,9 +13,8 @@ import sys
 from src.sparql.llm import http_client
 from src.sparql.execution import sparql_client
 from config.settings import SPARQL_ENDPOINT
-from src.indexing.chroma_storage import is_endpoint_indexed
+from src.indexing.chroma_storage import is_endpoint_indexed_count
 from api.routes.indexing import managed_indexing_task
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,  # Forces it to show INFO and DEBUG messages
@@ -70,7 +69,7 @@ app.include_router(linking.router, prefix="/api")
 
 
 class IndexRequest(BaseModel):
-    endpoint: str = None
+    endpoint: str = ""
     resume: bool = False
 
 

@@ -78,6 +78,18 @@
     overflow: hidden;
 }
 
+.jsonContainer {
+    width: 100%;
+    height: auto;
+    border: 1px solid #e0e6f7;
+    border-radius: 4px;
+    overflow: auto;
+}
+
+.jsonContainer .textarea{
+    min-height: 300px;
+
+}
 /* ===== STEP CARDS ===== */
 
 .endpointcard {
@@ -144,7 +156,6 @@
 .chatbox textarea,
 .responseCard p {
     width: 100%;
-    height: 100%;
     padding: 24px;
     border: none;
     resize: none;
@@ -381,7 +392,7 @@
 
 .indexLineContainer {
     display: grid;
-    grid-template-columns: 1fr 100px;
+    grid-template-columns: 1fr 100px 120px 50px;
     gap: 16px;
     align-items: flex-end;
 }
@@ -434,7 +445,6 @@
     color: white;
     flex: 1;
     position: relative;
-    padding: 12px 24px;
 }
 
 .indexBtn:hover:not(:disabled) {
@@ -491,19 +501,22 @@
     display: inline-block;
 }
 
-.translateBtn, .explainBtn {
+.translateBtn,
+.explainBtn {
     background: none;
     border: #f1d302 1px solid;
     color: black;
     justify-content: center;
 }
 
-.translateBtn:hover:not(:disabled), .explainBtn:hover:not(:disabled) {
+.translateBtn:hover:not(:disabled),
+.explainBtn:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(234, 232, 102, 0.4);
 }
 
-.translateBtn:disabled, .explainBtn:disabled {
+.translateBtn:disabled,
+.explainBtn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -554,6 +567,7 @@
 
 .textarea {
     width: 100%;
+    height: 100%;
     padding: 12px 14px;
     border: 2px solid #ddd;
     border-radius: 8px;
@@ -612,7 +626,6 @@
 }
 
 @media (max-width: 600px) {
-
     /* .container {
         padding: 20px 16px;
     } */
@@ -650,8 +663,8 @@
     }
 
     .title {
-        font-size: 28px;
-        margin-bottom: 24px;
+        font-size: 20px;
+        margin-bottom: 0px;
     }
 
     .cardHeader {
