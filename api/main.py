@@ -25,6 +25,8 @@ logging.basicConfig(
     ],
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 # safely close the global HTTP connection pool on server shutdown
