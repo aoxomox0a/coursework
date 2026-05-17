@@ -5,7 +5,7 @@ Ask questions in natural language, get answers from knowledge graphs.
 ## What it does
 
 - **Index** — Convert a knowledge graph into searchable embeddings
-- **Link** — Extract entities and relations from questions  
+- **Link** — Extract entities and relations from questions
 - **Generate** — Build SPARQL queries from linked concepts
 - **Execute** — Run queries and return results in plain English
 
@@ -40,13 +40,7 @@ Open `http://localhost:3000`.
 - Python 3.10+
 - Node.js 18+
 - `uv` (Python package manager)
-- `.env` configured with LLM and SPARQL endpoints
-
-```env
-SPARQL_ENDPOINT=http://dbpedia.org/sparql
-LLM_ENDPOINT=your_llm_server
-LLM_MODEL=mistral-7b-instruct
-```
+- `.env` configured — see [Environment variables](#environment-variables) below
 
 ## Key endpoints
 
@@ -66,8 +60,30 @@ api/                   # FastAPI routes
 src/
   ├── indexing/        # ChromaDB + embeddings
   ├── linking/         # Entity & relation extraction
-  └── sparql/          # SPARQL generation & execution
+  ├── sparql/          # SPARQL generation & execution
+  ├── evaluation/      # Offline pipeline evaluation
+  └── kg_profiles/     # Per-endpoint configuration & few-shot examples
+config/
+  └── curated_oneshots/  # Hand-authored Q/SPARQL examples per endpoint
+tests/                 # Full test suite (mirrors src/)
+docs/
+  └── adr/             # Architecture Decision Records
 ```
+
+## Module documentation
+
+| Module | README | Description |
+|--------|--------|-------------|
+| `src/` | [src/README.md](src/README.md) | Pipeline overview and module connections |
+| `src/indexing/` | [src/indexing/README.md](src/indexing/README.md) | Knowledge graph indexing into ChromaDB |
+| `src/linking/` | [src/linking/README.md](src/linking/README.md) | Entity & relation extraction and linking |
+| `src/sparql/` | [src/sparql/README.md](src/sparql/README.md) | SPARQL generation, validation, and execution |
+| `src/evaluation/` | [src/evaluation/README.md](src/evaluation/README.md) | Offline evaluation framework and metrics |
+| `src/kg_profiles/` | [src/kg_profiles/README.md](src/kg_profiles/README.md) | Per-endpoint profiles and one-shot examples |
+| `api/` | [api/README.md](api/README.md) | FastAPI routes and HTTP interface |
+| `ui/` | [ui/README.md](ui/README.md) | React/Next.js frontend |
+| `tests/` | [tests/README.md](tests/README.md) | Test suite structure and how to run tests |
+| `config/curated_oneshots/` | [config/curated_oneshots/README.md](config/curated_oneshots/README.md) | Format and instructions for few-shot examples |
 
 ## Environment variables
 
@@ -90,7 +106,7 @@ API_PORT=8000
 ## Dependencies
 
 - **FastAPI** — API server
-- **Chromadb** — Vector embeddings storage  
+- **Chromadb** — Vector embeddings storage
 - **sentence-transformers** — Text embeddings
 - **spaCy** — Named entity recognition
 - **httpx** — Async HTTP client for LLM & SPARQL calls
@@ -98,5 +114,6 @@ API_PORT=8000
 
 ## Useful links
 
-- [Architecture Decision Records](docs/adr/) — Design docs
-- [System Context](docs/architecture/system-context.puml) — High-level diagram
+- [Architecture Decision Records](docs/adr/) — Design decisions and rationale
+- [System Context diagram](docs/architecture/system-context.puml) — High-level component view
+- [QUICKSTART.md](QUICKSTART.md) — Step-by-step first-run guide
