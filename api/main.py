@@ -15,6 +15,7 @@ from src.sparql.execution import sparql_client
 from config.settings import SPARQL_ENDPOINT
 from src.indexing.chroma_storage import is_endpoint_indexed_count
 from api.routes.indexing import managed_indexing_task
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,  # Forces it to show INFO and DEBUG messages
@@ -23,6 +24,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)  # Forces the output to your terminal
     ],
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 # safely close the global HTTP connection pool on server shutdown
