@@ -89,11 +89,11 @@ docs/
 
 ```env
 # Knowledge graph
-SPARQL_ENDPOINT=http://dbpedia.org/sparql
+SPARQL_ENDPOINT=your_sparql_endpoint
 
 # LLM for SPARQL generation
-LLM_ENDPOINT=http://localhost:8001
-LLM_MODEL=mistral-7b-instruct
+LLM_ENDPOINT=your_llm_endpoint
+LLM_MODEL=your_llm_model
 
 # Storage
 CHROMA_DB_PATH=./data/chroma_db
