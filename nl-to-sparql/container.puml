@@ -1,0 +1,43 @@
+@startuml
+!NEW_C4_STYLE=1
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Container Diagram for NL-to-SPARQL Architecture
+
+Person(user, "Developer / Evaluator", "Interacts with the system via bash testing scripts or benchmarking tools.")
+
+System_Boundary(nl2sparql_system, "NL-to-SPARQL Platform") {
+    
+    Container(api_gateway, "FastAPI Service", "Python, Uvicorn", "Provides REST endpoint (/api/answer), handles Pydantic validation, and orchestrates the pipeline sequence.")
+    
+    Container(indexing_engine, "Indexing Pipeline", "Python", "Offline job: Downloads DBpedia ontology/properties and embeds them into the vector space.")
+    
+    Container(linking_engine, "Linking Pipeline", "Python, spaCy", "Extracts entities from English text and retrieves property candidates.")
+    
+    Container(sparql_engine, "SPARQL Generator", "Python", "Constructs few-shot prompts, manages LLM communication, and handles syntax validation/retries.")
+    
+    Container(execution_engine, "Execution Pipeline", "Python, httpx", "Executes queries against the Knowledge Graph and formats raw URIs and booleans.")
+    
+    ContainerDb(vector_db, "Vector Store", "ChromaDB", "Local DB storing embeddings of KG properties for semantic similarity search.")
+}
+
+System_Ext(llm_api, "LLM Provider", "External instruction-tuned model used for text-to-SPARQL translation.")
+System_Ext(dbpedia, "DBpedia KG", "Public SPARQL Endpoint (http://dbpedia.org/sparql).")
+
+' Relationships (API Flow)
+Rel(user, api_gateway, "Submits question & receives JSON answer", "HTTP/POST")
+
+Rel_D(api_gateway, linking_engine, "1. Initiates entity extraction")
+Rel_R(linking_engine, vector_db, "Queries candidate properties", "Vector Search")
+
+Rel_D(api_gateway, sparql_engine, "2. Passes entities & candidates")
+Rel_R(sparql_engine, llm_api, "Requests SPARQL generation", "HTTPS")
+
+Rel_D(api_gateway, execution_engine, "3. Passes valid SPARQL")
+Rel_R(execution_engine, dbpedia, "Executes SELECT/ASK queries", "HTTP/SPARQL")
+
+' Relationships (Offline Flow)
+Rel_U(indexing_engine, dbpedia, "Downloads property schema")
+Rel_R(indexing_engine, vector_db, "Populates embeddings")
+
+@enduml

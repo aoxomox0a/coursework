@@ -1,0 +1,9 @@
+{
+  "endpoint_url": "https://query.wikidata.org/sparql",
+  "slug": "wikidata",
+  "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
+  "property_typing": "untyped_fallback",
+  "class_typing": "untyped_fallback",
+  "has_language_tags": false,
+  "probed_at": "2026-05-11T12:40:57.804146+00:00"
+}

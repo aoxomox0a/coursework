@@ -1,0 +1,9 @@
+{
+  "endpoint_url": "https://api.parliament.uk/sparql",
+  "slug": "api",
+  "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
+  "property_typing": "rdf_property",
+  "class_typing": "rdfs_class",
+  "has_language_tags": false,
+  "probed_at": "2026-05-04T13:13:14.988271+00:00"
+}

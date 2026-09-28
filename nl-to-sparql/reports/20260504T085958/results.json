@@ -1,0 +1,221 @@
+{
+  "timestamp": "2026-05-04T09:00:26.660138+00:00",
+  "config": {
+    "gold_path": "data/gold/orkg_sciqa.jsonl",
+    "item_count": 5,
+    "judge_enabled": false
+  },
+  "funnel": {
+    "total": 5,
+    "syntax_valid": 5,
+    "executable_ok": 5,
+    "execution_match": 0,
+    "algebra_match": 0
+  },
+  "self_correction": {
+    "total": 5,
+    "first_pass_valid_count": 5,
+    "after_retry_valid_count": 5,
+    "first_pass_rate": 1.0,
+    "after_retry_rate": 1.0,
+    "delta": 0.0,
+    "recovered_by_retry": 0
+  },
+  "items": [
+    {
+      "gold_id": "AQ0002",
+      "question": "What models are being evaluated on the FTD dataset dataset?",
+      "gold_sparql": "SELECT DISTINCT ?model ?model_lbl\nWHERE {\n  ?dataset       a                orkgc:Dataset;\n                  rdfs:label       ?dataset_lbl.\n  FILTER (str(?dataset_lbl) = \"FTD dataset\")\n  ?benchmark      orkgp:HAS_DATASET       ?dataset;\n                  orkgp:HAS_EVALUATION    ?eval.\n  ?paper         orkgp:HAS_BENCHMARK      ?benchmark.\n  OPTIONAL {?paper      orkgp:HAS_MODEL          ?model.\n            ?model      rdfs:label               ?model_lbl.}\n}",
+      "trace": {
+        "question": "What models are being evaluated on the FTD dataset dataset?",
+        "first_pass_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbp: <http://dbpedia.org/property/>\n\nSELECT ?model WHERE {\n  ?model dbo:basedOn <http://dbpedia.org/resource/FTD_dataset> .\n  FILTER(LANG(?model) = 'en')\n}",
+        "first_pass_valid": true,
+        "first_pass_error": "",
+        "used_retry": false,
+        "retry_query": null,
+        "retry_valid": null,
+        "retry_error": null,
+        "final_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbp: <http://dbpedia.org/property/>\n\nSELECT ?model WHERE {\n  ?model dbo:basedOn <http://dbpedia.org/resource/FTD_dataset> .\n  FILTER(LANG(?model) = 'en')\n}",
+        "final_valid": true,
+        "bindings": [],
+        "answer": "No results found.",
+        "status": "success"
+      },
+      "syntax": {
+        "valid": true,
+        "error": ""
+      },
+      "execution_match": {
+        "match": false,
+        "score": 0.0,
+        "gold_count": 2,
+        "generated_count": 0,
+        "intersection": 0,
+        "false_positive_warning": ""
+      },
+      "algebra": {
+        "match": false,
+        "status": "compared",
+        "error": "",
+        "reason": "canonical algebra trees differ"
+      },
+      "judge": null
+    },
+    {
+      "gold_id": "AQ0007",
+      "question": "What models are being evaluated on the ACL Anthology dataset?",
+      "gold_sparql": "SELECT DISTINCT ?model ?model_lbl\nWHERE {\n  ?dataset       a                orkgc:Dataset;\n                  rdfs:label       ?dataset_lbl.\n  FILTER (str(?dataset_lbl) = \"ACL Anthology\")\n  ?benchmark      orkgp:HAS_DATASET       ?dataset;\n                  orkgp:HAS_EVALUATION    ?eval.\n  ?paper         orkgp:HAS_BENCHMARK      ?benchmark.\n  OPTIONAL {?paper      orkgp:HAS_MODEL          ?model.\n            ?model      rdfs:label               ?model_lbl.}\n}",
+      "trace": {
+        "question": "What models are being evaluated on the ACL Anthology dataset?",
+        "first_pass_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?model WHERE {\n  ?model dbo:basedOn <http://dbpedia.org/resource/Acl_Anthology> .\n}",
+        "first_pass_valid": true,
+        "first_pass_error": "",
+        "used_retry": false,
+        "retry_query": null,
+        "retry_valid": null,
+        "retry_error": null,
+        "final_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?model WHERE {\n  ?model dbo:basedOn <http://dbpedia.org/resource/Acl_Anthology> .\n}",
+        "final_valid": true,
+        "bindings": [],
+        "answer": "No results found.",
+        "status": "success"
+      },
+      "syntax": {
+        "valid": true,
+        "error": ""
+      },
+      "execution_match": {
+        "match": false,
+        "score": 0.0,
+        "gold_count": 1,
+        "generated_count": 0,
+        "intersection": 0,
+        "false_positive_warning": ""
+      },
+      "algebra": {
+        "match": false,
+        "status": "compared",
+        "error": "",
+        "reason": "canonical algebra trees differ"
+      },
+      "judge": null
+    },
+    {
+      "gold_id": "AQ0015",
+      "question": "What models are being evaluated on the Softcite dataset?",
+      "gold_sparql": "SELECT DISTINCT ?model ?model_lbl\nWHERE {\n  ?dataset       a                orkgc:Dataset;\n                  rdfs:label       ?dataset_lbl.\n  FILTER (str(?dataset_lbl) = \"Softcite\")\n  ?benchmark      orkgp:HAS_DATASET       ?dataset;\n                  orkgp:HAS_EVALUATION    ?eval.\n  ?paper         orkgp:HAS_BENCHMARK      ?benchmark.\n  OPTIONAL {?paper      orkgp:HAS_MODEL          ?model.\n            ?model      rdfs:label               ?model_lbl.}\n}",
+      "trace": {
+        "question": "What models are being evaluated on the Softcite dataset?",
+        "first_pass_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?model WHERE {\n  ?model dbo:basedOn <http://dbpedia.org/resource/Softcite_dataset> .\n}",
+        "first_pass_valid": true,
+        "first_pass_error": "",
+        "used_retry": false,
+        "retry_query": null,
+        "retry_valid": null,
+        "retry_error": null,
+        "final_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?model WHERE {\n  ?model dbo:basedOn <http://dbpedia.org/resource/Softcite_dataset> .\n}",
+        "final_valid": true,
+        "bindings": [],
+        "answer": "No results found.",
+        "status": "success"
+      },
+      "syntax": {
+        "valid": true,
+        "error": ""
+      },
+      "execution_match": {
+        "match": false,
+        "score": 0.0,
+        "gold_count": 1,
+        "generated_count": 0,
+        "intersection": 0,
+        "false_positive_warning": ""
+      },
+      "algebra": {
+        "match": false,
+        "status": "compared",
+        "error": "",
+        "reason": "canonical algebra trees differ"
+      },
+      "judge": null
+    },
+    {
+      "gold_id": "AQ0021",
+      "question": "What models are being evaluated on the TDMSci dataset?",
+      "gold_sparql": "SELECT DISTINCT ?model ?model_lbl\nWHERE {\n  ?dataset       a                orkgc:Dataset;\n                  rdfs:label       ?dataset_lbl.\n  FILTER (str(?dataset_lbl) = \"TDMSci\")\n  ?benchmark      orkgp:HAS_DATASET       ?dataset;\n                  orkgp:HAS_EVALUATION    ?eval.\n  ?paper         orkgp:HAS_BENCHMARK      ?benchmark.\n  OPTIONAL {?paper      orkgp:HAS_MODEL          ?model.\n            ?model      rdfs:label               ?model_lbl.}\n}",
+      "trace": {
+        "question": "What models are being evaluated on the TDMSci dataset?",
+        "first_pass_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbp: <http://dbpedia.org/property/>\n\nSELECT ?model WHERE {\n  <http://dbpedia.org/resource/TDMSci> dbo:basedOn ?model .\n  OPTIONAL { ?model dbp:tdp ?tdp } .\n  OPTIONAL { ?model dbp:bronzeOn ?bronzeOn } .\n  OPTIONAL { ?model dbp:cteam ?cteam } .\n  OPTIONAL { ?model dbp:dtxsid ?dtxsid } .\n  OPTIONAL { ?model dbp:goldOn ?goldOn } .\n  OPTIONAL { ?model dbp:silverOn ?silverOn } .\n  OPTIONAL { ?model dbp:tmrca ?tmrca } .\n  OPTIONAL { ?model dbp:drivesOn ?drivesOn } .\n  OPTIONAL { ?model dbp:tdsrank ?tdsrank } .\n}",
+        "first_pass_valid": true,
+        "first_pass_error": "",
+        "used_retry": false,
+        "retry_query": null,
+        "retry_valid": null,
+        "retry_error": null,
+        "final_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbp: <http://dbpedia.org/property/>\n\nSELECT ?model WHERE {\n  <http://dbpedia.org/resource/TDMSci> dbo:basedOn ?model .\n  OPTIONAL { ?model dbp:tdp ?tdp } .\n  OPTIONAL { ?model dbp:bronzeOn ?bronzeOn } .\n  OPTIONAL { ?model dbp:cteam ?cteam } .\n  OPTIONAL { ?model dbp:dtxsid ?dtxsid } .\n  OPTIONAL { ?model dbp:goldOn ?goldOn } .\n  OPTIONAL { ?model dbp:silverOn ?silverOn } .\n  OPTIONAL { ?model dbp:tmrca ?tmrca } .\n  OPTIONAL { ?model dbp:drivesOn ?drivesOn } .\n  OPTIONAL { ?model dbp:tdsrank ?tdsrank } .\n}",
+        "final_valid": true,
+        "bindings": [],
+        "answer": "No results found.",
+        "status": "success"
+      },
+      "syntax": {
+        "valid": true,
+        "error": ""
+      },
+      "execution_match": {
+        "match": false,
+        "score": 0.0,
+        "gold_count": 2,
+        "generated_count": 0,
+        "intersection": 0,
+        "false_positive_warning": ""
+      },
+      "algebra": {
+        "match": false,
+        "status": "compared",
+        "error": "",
+        "reason": "canonical algebra trees differ"
+      },
+      "judge": null
+    },
+    {
+      "gold_id": "AQ0023",
+      "question": "Could you provide a list of models that have been tested on the SciCite benchmark dataset?",
+      "gold_sparql": "SELECT DISTINCT ?model ?model_lbl\nWHERE {\n  ?dataset       a                orkgc:Dataset;\n                  rdfs:label       ?dataset_lbl.\n  FILTER (str(?dataset_lbl) = \"SciCite\")\n  ?benchmark      orkgp:HAS_DATASET       ?dataset;\n                  orkgp:HAS_EVALUATION    ?eval.\n  ?paper         orkgp:HAS_BENCHMARK      ?benchmark.\n  OPTIONAL {?paper      orkgp:HAS_MODEL          ?model.\n            ?model      rdfs:label               ?model_lbl.}\n}",
+      "trace": {
+        "question": "Could you provide a list of models that have been tested on the SciCite benchmark dataset?",
+        "first_pass_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbp: <http://dbpedia.org/property/>\n\nSELECT ?model WHERE {\n  ?model dbp:listOfWorks ?work .\n  ?work dbo:subject <http://dbpedia.org/resource/SciCite_benchmark_dataset> .\n}",
+        "first_pass_valid": true,
+        "first_pass_error": "",
+        "used_retry": false,
+        "retry_query": null,
+        "retry_valid": null,
+        "retry_error": null,
+        "final_query": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbp: <http://dbpedia.org/property/>\n\nSELECT ?model WHERE {\n  ?model dbp:listOfWorks ?work .\n  ?work dbo:subject <http://dbpedia.org/resource/SciCite_benchmark_dataset> .\n}",
+        "final_valid": true,
+        "bindings": [],
+        "answer": "No results found.",
+        "status": "success"
+      },
+      "syntax": {
+        "valid": true,
+        "error": ""
+      },
+      "execution_match": {
+        "match": false,
+        "score": 0.0,
+        "gold_count": 1,
+        "generated_count": 0,
+        "intersection": 0,
+        "false_positive_warning": ""
+      },
+      "algebra": {
+        "match": false,
+        "status": "compared",
+        "error": "",
+        "reason": "canonical algebra trees differ"
+      },
+      "judge": null
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "endpoint_url": "https://orkg.org/triplestore",
+  "slug": "orkg",
+  "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
+  "property_typing": "rdf_property",
+  "class_typing": "rdfs_class",
+  "has_language_tags": false,
+  "probed_at": "2026-05-04T09:43:31.972276+00:00"
+}
