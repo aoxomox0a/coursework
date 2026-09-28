@@ -1,9 +1,0 @@
-{
-  "endpoint_url": "http://dbpedia.org/sparql",
-  "slug": "dbpedia",
-  "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
-  "property_typing": "rdf_property",
-  "class_typing": "rdfs_class",
-  "has_language_tags": true,
-  "probed_at": "2026-05-12T09:56:28.533752+00:00"
-}

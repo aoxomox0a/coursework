@@ -1,9 +1,0 @@
-{
-  "endpoint_url": "https://linkedgeodata.org/sparql",
-  "slug": "linkedgeodata",
-  "label_predicate": "http://www.w3.org/2000/01/rdf-schema#label",
-  "property_typing": "rdf_property",
-  "class_typing": "rdfs_class",
-  "has_language_tags": true,
-  "probed_at": "2026-05-04T12:29:34.966367+00:00"
-}

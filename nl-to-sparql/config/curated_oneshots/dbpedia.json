@@ -1,9 +1,0 @@
-[
-  {
-    "question": "What is the capital of France?",
-    "entity_uris": ["http://dbpedia.org/resource/France"],
-    "property_uri": "http://dbpedia.org/ontology/capital",
-    "sparql": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?capital WHERE {\n  <http://dbpedia.org/resource/France> dbo:capital ?capital .\n}",
-    "tags": ["factoid"]
-  }
-]
